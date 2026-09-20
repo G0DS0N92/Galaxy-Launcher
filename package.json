@@ -1,0 +1,89 @@
+{
+  "name": "galaxy-launcher",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Next-generation, modern, cosmic-themed Minecraft launcher for Premium & Cracked players",
+  "main": "dist-electron/main/index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build && esbuild src/preload/index.ts --bundle --platform=node --outfile=dist-electron/preload/index.cjs --format=cjs --external:electron",
+    "preview": "vite preview",
+    "pack": "npm run build && electron-builder --dir",
+    "dist": "npm run build && electron-builder --win nsis",
+    "setup": "npm run build && electron-builder --dir && node scripts/build-setup.mjs"
+  },
+  "build": {
+    "appId": "com.galaxy.launcher",
+    "productName": "Galaxy Launcher",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Galaxy Launcher",
+      "artifactName": "Galaxy Launcher Setup ${version}.${ext}",
+      "include": "build/installer.nsh"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "G0DS0N92",
+      "repo": "Galaxy-Launcher"
+    }
+  },
+  "keywords": [
+    "minecraft",
+    "launcher",
+    "galaxy",
+    "modrinth",
+    "curseforge",
+    "fabric",
+    "forge",
+    "neoforge",
+    "quilt",
+    "electron",
+    "react"
+  ],
+  "author": "Galaxy Team",
+  "license": "MIT",
+  "dependencies": {
+    "adm-zip": "^0.5.16",
+    "canvas-confetti": "^1.9.4",
+    "clsx": "^2.1.1",
+    "electron-updater": "^6.8.9",
+    "lucide-react": "^1.16.0",
+    "tailwind-merge": "^3.5.0",
+    "three": "^0.183.2"
+  },
+  "devDependencies": {
+    "@types/adm-zip": "^0.5.7",
+    "@types/canvas-confetti": "^1.9.0",
+    "@types/node": "^22.13.10",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@types/three": "^0.183.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "electron": "^34.3.0",
+    "electron-builder": "^25.1.8",
+    "postcss": "^8.5.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.3",
+    "vite": "^6.2.1",
+    "vite-plugin-electron": "^0.29.0",
+    "vite-plugin-electron-renderer": "^0.14.6"
+  }
+}

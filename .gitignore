@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs & Release installers
+dist/
+dist-electron/
+release/
+*.exe
+*.blockmap
+*.zip
+*.tar.gz
+
+# Local user configs / app data cache
+launcher-config.json
+accounts.json
+instances/
+
+# OS / Editor files
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/
