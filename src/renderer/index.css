@@ -1,0 +1,242 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root, [data-theme="deep-void"], .theme-deep-void {
+  --theme-accent: #6366f1;
+  --theme-accent-hover: #4f46e5;
+  --theme-accent-glow: rgba(99, 102, 241, 0.45);
+  --theme-accent-subtle: rgba(99, 102, 241, 0.18);
+  --theme-secondary: #64748b;
+  --theme-secondary-glow: rgba(100, 116, 139, 0.35);
+  --theme-border: rgba(99, 102, 241, 0.35);
+  --theme-border-active: rgba(99, 102, 241, 0.6);
+  --theme-grad-from: #4f46e5;
+  --theme-grad-to: #334155;
+  --theme-bg-radial: radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.18) 0%, rgba(5, 6, 10, 0.99) 80%);
+}
+
+[data-theme="nebula-purple"], .theme-nebula-purple {
+  --theme-accent: #a855f7;
+  --theme-accent-hover: #9333ea;
+  --theme-accent-glow: rgba(168, 85, 247, 0.45);
+  --theme-accent-subtle: rgba(168, 85, 247, 0.15);
+  --theme-secondary: #06b6d4;
+  --theme-secondary-glow: rgba(6, 182, 212, 0.35);
+  --theme-border: rgba(168, 85, 247, 0.3);
+  --theme-border-active: rgba(168, 85, 247, 0.6);
+  --theme-grad-from: #9333ea;
+  --theme-grad-to: #06b6d4;
+  --theme-bg-radial: radial-gradient(circle at 50% 0%, rgba(147, 51, 234, 0.22) 0%, rgba(7, 8, 14, 0.98) 75%);
+}
+
+[data-theme="supernova-cyan"], .theme-supernova-cyan {
+  --theme-accent: #06b6d4;
+  --theme-accent-hover: #0891b2;
+  --theme-accent-glow: rgba(6, 182, 212, 0.5);
+  --theme-accent-subtle: rgba(6, 182, 212, 0.18);
+  --theme-secondary: #3b82f6;
+  --theme-secondary-glow: rgba(59, 130, 246, 0.35);
+  --theme-border: rgba(6, 182, 212, 0.35);
+  --theme-border-active: rgba(6, 182, 212, 0.7);
+  --theme-grad-from: #06b6d4;
+  --theme-grad-to: #2563eb;
+  --theme-bg-radial: radial-gradient(circle at 50% 0%, rgba(6, 182, 212, 0.22) 0%, rgba(7, 8, 14, 0.98) 75%);
+}
+
+[data-theme="solar-gold"], .theme-solar-gold {
+  --theme-accent: #f59e0b;
+  --theme-accent-hover: #d97706;
+  --theme-accent-glow: rgba(245, 158, 11, 0.5);
+  --theme-accent-subtle: rgba(245, 158, 11, 0.18);
+  --theme-secondary: #ea580c;
+  --theme-secondary-glow: rgba(234, 88, 12, 0.35);
+  --theme-border: rgba(245, 158, 11, 0.35);
+  --theme-border-active: rgba(245, 158, 11, 0.7);
+  --theme-grad-from: #f59e0b;
+  --theme-grad-to: #ea580c;
+  --theme-bg-radial: radial-gradient(circle at 50% 0%, rgba(245, 158, 11, 0.22) 0%, rgba(7, 8, 14, 0.98) 75%);
+}
+
+
+[data-theme="emerald-aurora"], .theme-emerald-aurora {
+  --theme-accent: #10b981;
+  --theme-accent-hover: #059669;
+  --theme-accent-glow: rgba(16, 185, 129, 0.5);
+  --theme-accent-subtle: rgba(16, 185, 129, 0.18);
+  --theme-secondary: #06b6d4;
+  --theme-secondary-glow: rgba(6, 182, 212, 0.35);
+  --theme-border: rgba(16, 185, 129, 0.35);
+  --theme-border-active: rgba(16, 185, 129, 0.7);
+  --theme-grad-from: #10b981;
+  --theme-grad-to: #06b6d4;
+  --theme-bg-radial: radial-gradient(circle at 50% 0%, rgba(16, 185, 129, 0.22) 0%, rgba(7, 8, 14, 0.98) 75%);
+}
+
+[data-theme="crimson-quasar"], .theme-crimson-quasar {
+  --theme-accent: #f43f5e;
+  --theme-accent-hover: #e11d48;
+  --theme-accent-glow: rgba(244, 63, 94, 0.5);
+  --theme-accent-subtle: rgba(244, 63, 94, 0.18);
+  --theme-secondary: #ec4899;
+  --theme-secondary-glow: rgba(236, 72, 153, 0.35);
+  --theme-border: rgba(244, 63, 94, 0.35);
+  --theme-border-active: rgba(244, 63, 94, 0.7);
+  --theme-grad-from: #f43f5e;
+  --theme-grad-to: #be123c;
+  --theme-bg-radial: radial-gradient(circle at 50% 0%, rgba(244, 63, 94, 0.22) 0%, rgba(10, 4, 8, 0.98) 75%);
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(13, 15, 26, 0.5);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--theme-accent);
+}
+
+/* Scrollbar Hiding Utility */
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+.no-scrollbar {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+
+/* Frameless Window Drag Region */
+.app-drag-region {
+  -webkit-app-region: drag;
+}
+
+.app-no-drag {
+  -webkit-app-region: no-drag;
+}
+
+/* Glassmorphism Styles */
+.glass-panel {
+  background: rgba(18, 20, 36, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-panel-glow {
+  background: rgba(18, 20, 36, 0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--theme-border);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37), 0 0 20px var(--theme-accent-glow);
+}
+
+.glass-card {
+  background: rgba(22, 25, 46, 0.55);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-card:hover {
+  background: rgba(28, 32, 58, 0.75);
+  border-color: var(--theme-border);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 0 20px var(--theme-accent-glow);
+}
+
+.text-gradient {
+  background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 50%, #94a3b8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.text-gradient-accent {
+  background: linear-gradient(135deg, #ffffff 0%, var(--theme-accent) 60%, var(--theme-secondary) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Dynamic Reactive Buttons & Accents */
+.btn-accent {
+  background: linear-gradient(135deg, var(--theme-grad-from) 0%, var(--theme-grad-to) 100%);
+  color: white;
+  box-shadow: 0 0 20px var(--theme-accent-glow);
+  transition: all 0.2s ease;
+}
+
+.btn-accent:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 30px var(--theme-accent-glow);
+  filter: brightness(1.1);
+}
+
+.btn-accent:active {
+  transform: translateY(0px);
+}
+
+.theme-nav-active {
+  background: var(--theme-accent-subtle) !important;
+  color: #ffffff !important;
+  border: 1px solid var(--theme-border-active) !important;
+  box-shadow: 0 0 15px var(--theme-accent-glow) !important;
+}
+
+.theme-nav-active svg {
+  color: var(--theme-accent) !important;
+}
+
+.theme-badge {
+  background: var(--theme-accent-subtle);
+  color: var(--theme-accent);
+  border: 1px solid var(--theme-border);
+}
+
+.theme-accent-bg {
+  background-color: var(--theme-accent);
+}
+
+.theme-accent-text {
+  color: var(--theme-accent);
+}
+
+/* Shimmer Animation */
+.shimmer-mask {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  background-size: 200% 100%;
+}
+
+/* Celestial Moon Float & Glow Animation */
+@keyframes celestial-float {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg) scale(1);
+    filter: drop-shadow(0 0 6px rgba(165, 180, 252, 0.6));
+  }
+  50% {
+    transform: translateY(-2.5px) rotate(-8deg) scale(1.06);
+    filter: drop-shadow(0 0 14px rgba(165, 180, 252, 0.95));
+  }
+}
+
+.animate-celestial-moon {
+  animation: celestial-float 3.5s ease-in-out infinite;
+}
+
