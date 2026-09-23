@@ -3,6 +3,10 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import * as https from 'https';
 import * as http from 'http';
+import * as zlib from 'zlib';
+
+const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 64, maxFreeSockets: 32 });
+const httpAgent = new http.Agent({ keepAlive: true, maxSockets: 64, maxFreeSockets: 32 });
 
 export interface DownloadTask {
   url: string;
@@ -16,7 +20,8 @@ export class Downloader {
     url: string,
     destPath: string,
     expectedSha1?: string,
-    onProgress?: (bytes: number, total: number) => void
+    onProgress?: (bytes: number, total: number) => void,
+    retries = 3
   ): Promise<void> {
     await fs.promises.mkdir(path.dirname(destPath), { recursive: true });
 
@@ -25,62 +30,134 @@ export class Downloader {
       const match = await this.verifySha1(destPath, expectedSha1);
       if (match) {
         if (onProgress) {
-          const stat = await fs.promises.stat(destPath);
-          onProgress(stat.size, stat.size);
+          try {
+            const stat = await fs.promises.stat(destPath);
+            onProgress(stat.size, stat.size);
+          } catch {}
         }
         return;
       }
     }
 
+    let lastError: any = null;
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        await this.doDownload(url, destPath, expectedSha1, onProgress);
+        return;
+      } catch (err: any) {
+        lastError = err;
+        try {
+          if (fs.existsSync(destPath)) await fs.promises.unlink(destPath);
+        } catch {}
+        if (attempt < retries) {
+          await new Promise((r) => setTimeout(r, attempt * 350));
+        }
+      }
+    }
+
+    throw lastError || new Error(`Failed to download ${url} after ${retries} attempts`);
+  }
+
+  private static doDownload(
+    url: string,
+    destPath: string,
+    expectedSha1?: string,
+    onProgress?: (bytes: number, total: number) => void
+  ): Promise<void> {
     return new Promise((resolve, reject) => {
       const parsedUrl = new URL(url);
       const getter = parsedUrl.protocol === 'https:' ? https.get : http.get;
+      const agent = parsedUrl.protocol === 'https:' ? httpsAgent : httpAgent;
 
-      const req = getter(url, { headers: { 'User-Agent': 'GalaxyLauncher/1.0' } }, (res) => {
-        // Follow redirects (301, 302, 307, 308)
-        if (res.statusCode && [301, 302, 307, 308].includes(res.statusCode) && res.headers.location) {
-          return this.downloadFile(res.headers.location, destPath, expectedSha1, onProgress)
-            .then(resolve)
-            .catch(reject);
-        }
-
-        if (res.statusCode && res.statusCode >= 400) {
-          return reject(new Error(`Failed to download ${url}: HTTP ${res.statusCode}`));
-        }
-
-        const totalBytes = parseInt(res.headers['content-length'] || '0', 10);
-        let downloadedBytes = 0;
-        const fileStream = fs.createWriteStream(destPath);
-        const hash = crypto.createHash('sha1');
-
-        res.on('data', (chunk) => {
-          downloadedBytes += chunk.length;
-          hash.update(chunk);
-          if (onProgress) {
-            onProgress(downloadedBytes, totalBytes);
+      const req = getter(
+        url,
+        {
+          agent,
+          headers: {
+            'User-Agent': 'GalaxyLauncher/1.0 (Minecraft Desktop Client)',
+            'Accept': '*/*'
+          },
+          timeout: 25000
+        },
+        (res) => {
+          // Follow redirects (301, 302, 307, 308)
+          if (res.statusCode && [301, 302, 307, 308].includes(res.statusCode) && res.headers.location) {
+            return this.doDownload(res.headers.location, destPath, expectedSha1, onProgress)
+              .then(resolve)
+              .catch(reject);
           }
-        });
 
-        res.pipe(fileStream);
-
-        fileStream.on('finish', () => {
-          fileStream.close();
-          const fileHash = hash.digest('hex');
-          if (expectedSha1 && fileHash.toLowerCase() !== expectedSha1.toLowerCase()) {
-            fs.unlink(destPath, () => {});
-            return reject(new Error(`SHA-1 mismatch for ${url}. Expected ${expectedSha1}, got ${fileHash}`));
+          if (res.statusCode && res.statusCode >= 400) {
+            return reject(new Error(`Failed to download ${url}: HTTP ${res.statusCode}`));
           }
-          resolve();
-        });
 
-        fileStream.on('error', (err) => {
-          fs.unlink(destPath, () => {});
-          reject(err);
-        });
+          const totalBytes = parseInt(res.headers['content-length'] || '0', 10);
+          let downloadedBytes = 0;
+
+          const encoding = (res.headers['content-encoding'] || '').toLowerCase();
+          let sourceStream: NodeJS.ReadableStream = res;
+          if (encoding === 'gzip') {
+            sourceStream = res.pipe(zlib.createGunzip());
+          } else if (encoding === 'deflate') {
+            sourceStream = res.pipe(zlib.createInflate());
+          } else if (encoding === 'br') {
+            sourceStream = res.pipe(zlib.createBrotliDecompress());
+          }
+
+          const fileStream = fs.createWriteStream(destPath);
+          const hash = crypto.createHash('sha1');
+
+          sourceStream.on('data', (chunk) => {
+            const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+            downloadedBytes += buf.length;
+            hash.update(buf);
+            if (onProgress) {
+              onProgress(downloadedBytes, totalBytes);
+            }
+          });
+
+          sourceStream.pipe(fileStream);
+
+          let finished = false;
+          const cleanup = () => {
+            if (!finished) {
+              finished = true;
+              try { fileStream.destroy(); } catch {}
+              try { if (fs.existsSync(destPath)) fs.unlinkSync(destPath); } catch {}
+            }
+          };
+
+          fileStream.on('finish', () => {
+            fileStream.close();
+            finished = true;
+            const fileHash = hash.digest('hex');
+            if (expectedSha1 && fileHash.toLowerCase() !== expectedSha1.toLowerCase()) {
+              cleanup();
+              return reject(new Error(`SHA-1 mismatch for ${url}. Expected ${expectedSha1}, got ${fileHash}`));
+            }
+            resolve();
+          });
+
+          fileStream.on('error', (err) => {
+            cleanup();
+            reject(err);
+          });
+
+          sourceStream.on('error', (err) => {
+            cleanup();
+            reject(err);
+          });
+        }
+      );
+
+      req.on('timeout', () => {
+        req.destroy();
+        try { if (fs.existsSync(destPath)) fs.unlinkSync(destPath); } catch {}
+        reject(new Error(`Download timed out for ${url}`));
       });
 
       req.on('error', (err) => {
-        fs.unlink(destPath, () => {});
+        try { if (fs.existsSync(destPath)) fs.unlinkSync(destPath); } catch {}
         reject(err);
       });
     });
@@ -88,11 +165,13 @@ export class Downloader {
 
   public static async downloadParallel(
     tasks: DownloadTask[],
-    concurrency = 8,
+    concurrency = 16,
     onOverallProgress?: (completed: number, total: number, currentItem?: string) => void
   ): Promise<void> {
     let completed = 0;
     const total = tasks.length;
+    if (total === 0) return;
+
     let index = 0;
 
     const worker = async () => {
@@ -114,8 +193,9 @@ export class Downloader {
       }
     };
 
+    const workerCount = Math.min(concurrency, tasks.length);
     const workers = [];
-    for (let i = 0; i < Math.min(concurrency, tasks.length); i++) {
+    for (let i = 0; i < workerCount; i++) {
       workers.push(worker());
     }
 
@@ -137,25 +217,55 @@ export class Downloader {
     return new Promise((resolve, reject) => {
       const parsedUrl = new URL(url);
       const getter = parsedUrl.protocol === 'https:' ? https.get : http.get;
+      const agent = parsedUrl.protocol === 'https:' ? httpsAgent : httpAgent;
 
-      const req = getter(url, { headers: { 'User-Agent': 'GalaxyLauncher/1.0' } }, (res) => {
-        if (res.statusCode && [301, 302, 307, 308].includes(res.statusCode) && res.headers.location) {
-          return this.fetchJson<T>(res.headers.location).then(resolve).catch(reject);
-        }
-
-        if (res.statusCode && res.statusCode >= 400) {
-          return reject(new Error(`Failed to fetch JSON from ${url}: HTTP ${res.statusCode}`));
-        }
-
-        let data = '';
-        res.on('data', chunk => data += chunk);
-        res.on('end', () => {
-          try {
-            resolve(JSON.parse(data));
-          } catch (e) {
-            reject(e);
+      const req = getter(
+        url,
+        {
+          agent,
+          headers: {
+            'User-Agent': 'GalaxyLauncher/1.0 (Minecraft Desktop Client)',
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Encoding': 'gzip, deflate, br'
+          },
+          timeout: 20000
+        },
+        (res) => {
+          if (res.statusCode && [301, 302, 307, 308].includes(res.statusCode) && res.headers.location) {
+            return this.fetchJson<T>(res.headers.location).then(resolve).catch(reject);
           }
-        });
+
+          if (res.statusCode && res.statusCode >= 400) {
+            return reject(new Error(`Failed to fetch JSON from ${url}: HTTP ${res.statusCode}`));
+          }
+
+          const encoding = (res.headers['content-encoding'] || '').toLowerCase();
+          let stream: NodeJS.ReadableStream = res;
+          if (encoding === 'gzip') {
+            stream = res.pipe(zlib.createGunzip());
+          } else if (encoding === 'deflate') {
+            stream = res.pipe(zlib.createInflate());
+          } else if (encoding === 'br') {
+            stream = res.pipe(zlib.createBrotliDecompress());
+          }
+
+          const chunks: Buffer[] = [];
+          stream.on('data', (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+          stream.on('end', () => {
+            try {
+              const raw = Buffer.concat(chunks).toString('utf-8');
+              resolve(JSON.parse(raw));
+            } catch (e) {
+              reject(e);
+            }
+          });
+          stream.on('error', reject);
+        }
+      );
+
+      req.on('timeout', () => {
+        req.destroy();
+        reject(new Error(`Fetch timed out for ${url}`));
       });
 
       req.on('error', reject);

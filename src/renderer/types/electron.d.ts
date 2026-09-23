@@ -1,4 +1,4 @@
-import { GalaxyAPI } from '../../preload/index';
+import { GalaxyAPI } from '../../preload/types';
 
 declare global {
   interface Window {

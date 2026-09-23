@@ -57,16 +57,24 @@ export const BackgroundCanvas: React.FC<BackgroundCanvasProps> = ({ animated = t
       width = canvas.width = window.innerWidth;
       height = canvas.height = window.innerHeight;
       initStars();
+      if (!animated) {
+        render();
+      }
     };
 
     window.addEventListener('resize', handleResize);
 
     const handleMouseMove = (e: MouseEvent) => {
+      if (!animated) return;
       mousePos.current.targetX = (e.clientX - width / 2) * 0.05;
       mousePos.current.targetY = (e.clientY - height / 2) * 0.05;
     };
 
-    window.addEventListener('mousemove', handleMouseMove);
+    if (animated) {
+      window.addEventListener('mousemove', handleMouseMove);
+    } else {
+      mousePos.current = { x: 0, y: 0, targetX: 0, targetY: 0 };
+    }
 
     // Initialize Stars
     let stars: Star[] = [];
@@ -120,6 +128,15 @@ export const BackgroundCanvas: React.FC<BackgroundCanvasProps> = ({ animated = t
             starGlow: 'rgba(252, 211, 77, 0.5)',
             trailColor: 'rgba(245, 158, 11, '
           };
+        case 'crimson-quasar':
+          return {
+            nebulaInner: 'rgba(225, 29, 72, 0.55)',
+            nebulaMid: 'rgba(159, 18, 57, 0.8)',
+            nebulaOuter: 'rgba(24, 4, 10, 0.98)',
+            orbColor: 'rgba(244, 63, 94, 0.35)',
+            starGlow: 'rgba(251, 113, 133, 0.5)',
+            trailColor: 'rgba(225, 29, 72, '
+          };
         case 'deep-void':
           return {
             nebulaInner: 'rgba(51, 65, 85, 0.55)',
@@ -142,10 +159,13 @@ export const BackgroundCanvas: React.FC<BackgroundCanvasProps> = ({ animated = t
       }
     };
 
+    let galaxyAngle = 0;
+
     const render = () => {
       if (!ctx || !canvas) return;
 
       const colors = getThemeColors(currentThemeRef.current);
+      galaxyAngle += 0.0008;
 
       // Mouse smooth interpolation
       mousePos.current.x += (mousePos.current.targetX - mousePos.current.x) * 0.05;
@@ -181,6 +201,40 @@ export const BackgroundCanvas: React.FC<BackgroundCanvasProps> = ({ animated = t
       orbGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
       ctx.fillStyle = orbGrad;
       ctx.fillRect(0, 0, width, height);
+
+      // Draw tertiary celestial nebula cluster on the left
+      const leftOrbGrad = ctx.createRadialGradient(
+        width * 0.15 - mousePos.current.x * 0.5,
+        height * 0.35 - mousePos.current.y * 0.5,
+        5,
+        width * 0.15,
+        height * 0.35,
+        width * 0.35
+      );
+      leftOrbGrad.addColorStop(0, colors.orbColor);
+      leftOrbGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = leftOrbGrad;
+      ctx.fillRect(0, 0, width, height);
+
+      // Subtle Galactic Spiral Stardust Arms in background
+      ctx.save();
+      ctx.translate(width * 0.5 + mousePos.current.x * 0.8, height * 0.45 + mousePos.current.y * 0.8);
+      ctx.rotate(galaxyAngle);
+      for (let arm = 0; arm < 2; arm++) {
+        const armOffset = arm * Math.PI;
+        for (let pt = 10; pt < 70; pt += 6) {
+          const dist = pt * 4.5;
+          const theta = (pt * 0.12) + armOffset;
+          const px = Math.cos(theta) * dist;
+          const py = Math.sin(theta) * dist * 0.45; // ellipse perspective
+          const dustSize = 1.2 + (Math.sin(pt) * 0.8);
+          ctx.beginPath();
+          ctx.arc(px, py, dustSize, 0, Math.PI * 2);
+          ctx.fillStyle = colors.starGlow;
+          ctx.fill();
+        }
+      }
+      ctx.restore();
 
       // Draw Stars
       for (const s of stars) {
@@ -261,7 +315,9 @@ export const BackgroundCanvas: React.FC<BackgroundCanvasProps> = ({ animated = t
         ctx.stroke();
       }
 
-      animFrameId = requestAnimationFrame(render);
+      if (animated) {
+        animFrameId = requestAnimationFrame(render);
+      }
     };
 
     render();

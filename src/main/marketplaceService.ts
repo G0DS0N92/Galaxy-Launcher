@@ -102,10 +102,20 @@ export class MarketplaceService {
       let url = `${this.MODRINTH_API}/project/${projectIdOrSlug}/version`;
       const queryParams: string[] = [];
       if (loaders && loaders.length > 0) {
-        queryParams.push(`loaders=${encodeURIComponent(JSON.stringify(loaders))}`);
+        const cleanLoaders = loaders
+          .map((l) => (l || '').toLowerCase().trim())
+          .filter((l) => l && l !== 'vanilla');
+        if (cleanLoaders.length > 0) {
+          queryParams.push(`loaders=${encodeURIComponent(JSON.stringify(cleanLoaders))}`);
+        }
       }
       if (gameVersions && gameVersions.length > 0) {
-        queryParams.push(`game_versions=${encodeURIComponent(JSON.stringify(gameVersions))}`);
+        const cleanGameVersions = gameVersions
+          .map((v) => (v || '').trim())
+          .filter(Boolean);
+        if (cleanGameVersions.length > 0) {
+          queryParams.push(`game_versions=${encodeURIComponent(JSON.stringify(cleanGameVersions))}`);
+        }
       }
       if (queryParams.length > 0) {
         url += `?${queryParams.join('&')}`;
@@ -125,11 +135,49 @@ export class MarketplaceService {
           size: f.size,
           hashes: f.hashes || {}
         })),
-        datePublished: v.date_published
+        dependencies: (v.dependencies || []).map((d: any) => ({
+          version_id: d.version_id,
+          project_id: d.project_id,
+          file_name: d.file_name,
+          dependency_type: d.dependency_type
+        })),
+        datePublished: v.date_published,
+        versionType: v.version_type
       }));
     } catch (err) {
       console.error(`Failed to get versions for ${projectIdOrSlug}:`, err);
       return [];
+    }
+  }
+
+  public static async getVersionById(versionId: string): Promise<MarketplaceVersion | null> {
+    try {
+      const v = await Downloader.fetchJson<any>(`${this.MODRINTH_API}/version/${versionId}`);
+      return {
+        id: v.id,
+        versionNumber: v.version_number,
+        name: v.name,
+        gameVersions: v.game_versions || [],
+        loaders: v.loaders || [],
+        files: (v.files || []).map((f: any) => ({
+          url: f.url,
+          filename: f.filename,
+          primary: f.primary,
+          size: f.size,
+          hashes: f.hashes || {}
+        })),
+        dependencies: (v.dependencies || []).map((d: any) => ({
+          version_id: d.version_id,
+          project_id: d.project_id,
+          file_name: d.file_name,
+          dependency_type: d.dependency_type
+        })),
+        datePublished: v.date_published,
+        versionType: v.version_type
+      };
+    } catch (err) {
+      console.error(`Failed to get version by id ${versionId}:`, err);
+      return null;
     }
   }
 
@@ -150,9 +198,119 @@ export class MarketplaceService {
     const targetDir = path.join(instancePath, targetSubDir);
     await fs.promises.mkdir(targetDir, { recursive: true });
 
+    // Clean up older duplicate version of the same mod if present
+    if (projectType === 'mod') {
+      try {
+        const existingFiles = await fs.promises.readdir(targetDir);
+        const cleanBase = filename.split(/[-_+v\d]/)[0]?.toLowerCase();
+        if (cleanBase && cleanBase.length >= 3) {
+          for (const ex of existingFiles) {
+            if (ex !== filename && ex.toLowerCase().startsWith(cleanBase) && (ex.endsWith('.jar') || ex.endsWith('.jar.disabled'))) {
+              try {
+                await fs.promises.unlink(path.join(targetDir, ex));
+              } catch {}
+            }
+          }
+        }
+      } catch {}
+    }
+
     const destPath = path.join(targetDir, filename);
     await Downloader.downloadFile(downloadUrl, destPath, sha1, onProgress);
     return destPath;
+  }
+
+  public static async installModWithDependencies(
+    instanceManager: InstanceManager,
+    instanceId: string,
+    modDownloadUrl: string,
+    modFilename: string,
+    modSha1: string | undefined,
+    versionDependencies: any[] | undefined,
+    loader: string,
+    gameVersion: string,
+    onProgress?: (filename: string, bytes: number, total: number) => void
+  ): Promise<{ installedFiles: string[]; dependencyNames: string[] }> {
+    const installedFiles: string[] = [];
+    const dependencyNames: string[] = [];
+    const visitedProjects = new Set<string>();
+    const visitedVersions = new Set<string>();
+
+    // 1. Download the target mod
+    await this.installItemToInstance(
+      instanceManager,
+      instanceId,
+      'mod',
+      modDownloadUrl,
+      modFilename,
+      modSha1,
+      (bytes, total) => onProgress?.(modFilename, bytes, total)
+    );
+    installedFiles.push(modFilename);
+
+    // 2. Recursive dependency resolution helper
+    const resolveAndInstallDeps = async (deps: any[]) => {
+      const requiredDeps = deps.filter((d: any) => d && d.dependency_type === 'required');
+      for (const dep of requiredDeps) {
+        try {
+          let depVer: MarketplaceVersion | null = null;
+          let depProjId = dep.project_id;
+
+          if (dep.version_id) {
+            if (visitedVersions.has(dep.version_id)) continue;
+            visitedVersions.add(dep.version_id);
+            depVer = await this.getVersionById(dep.version_id);
+          } else if (dep.project_id) {
+            if (visitedProjects.has(dep.project_id)) continue;
+            visitedProjects.add(dep.project_id);
+            const vers = await this.getProjectVersions(dep.project_id, [loader], [gameVersion]);
+            depVer = vers[0] || (await this.getProjectVersions(dep.project_id))[0] || null;
+          }
+
+          if (!depVer || !depVer.files || depVer.files.length === 0) continue;
+
+          const depFile = depVer.files.find((f) => f.primary) || depVer.files[0];
+          if (!depFile || !depFile.url) continue;
+
+          // Check if file or mod is already installed in the instance
+          const instanceMods = await instanceManager.getMods(instanceId);
+          const alreadyHasFile = instanceMods.some((m) =>
+            m.filename.toLowerCase() === depFile.filename.toLowerCase() ||
+            (depProjId && m.filename.toLowerCase().includes(depProjId.toLowerCase()))
+          );
+
+          if (!alreadyHasFile) {
+            await this.installItemToInstance(
+              instanceManager,
+              instanceId,
+              'mod',
+              depFile.url,
+              depFile.filename,
+              depFile.hashes?.sha1,
+              (bytes, total) => onProgress?.(depFile.filename, bytes, total)
+            );
+            installedFiles.push(depFile.filename);
+            const niceName = depVer.name || depFile.filename.replace(/\.jar$/i, '');
+            if (!dependencyNames.includes(niceName)) {
+              dependencyNames.push(niceName);
+            }
+
+            // Recurse into dependencies of this dependency
+            if (depVer.dependencies && depVer.dependencies.length > 0) {
+              await resolveAndInstallDeps(depVer.dependencies);
+            }
+          }
+        } catch (depErr) {
+          console.warn('[Marketplace] Could not auto-install dependency:', dep, depErr);
+        }
+      }
+    };
+
+    if (versionDependencies && versionDependencies.length > 0) {
+      await resolveAndInstallDeps(versionDependencies);
+    }
+
+    return { installedFiles, dependencyNames };
   }
 
   public static async installModpack(

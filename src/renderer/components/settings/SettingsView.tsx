@@ -1,21 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Settings as SettingsIcon,
   Cpu,
   HardDrive,
-  Palette,
-  Volume2,
   FolderOpen,
   RefreshCw,
-  Check,
   Sparkles,
-  ShieldCheck,
-  Sliders,
-  Flame,
-  Trash2
+  Trash2,
+  Monitor,
+  Gauge,
+  Cloud,
+  Layers
 } from 'lucide-react';
-import { LauncherSettings, JavaInstallation } from '../../types';
+import { LauncherSettings, JavaInstallation, SystemSpecs } from '../../types';
 import { sounds } from '../../services/soundEngine';
+import { ConfirmModal } from '../common/ConfirmModal';
 
 interface SettingsViewProps {
   settings: LauncherSettings;
@@ -36,34 +35,27 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 }) => {
   const [currentSettings, setCurrentSettings] = useState<LauncherSettings>(settings);
   const [scanning, setScanning] = useState(false);
+  const [appVersion, setAppVersion] = useState('1.0.4');
+  const [showWipeModal, setShowWipeModal] = useState(false);
+  const [isWiping, setIsWiping] = useState(false);
+  const [systemSpecs, setSystemSpecs] = useState<SystemSpecs | null>(null);
 
-  const handleThemeChange = (theme: LauncherSettings['theme']) => {
-    sounds.playSwitch();
-    const updated = { ...currentSettings, theme };
-    setCurrentSettings(updated);
-    document.documentElement.className = `theme-${theme}`;
-    document.documentElement.setAttribute('data-theme', theme);
-    onSaveSettings(updated);
-    onShowToast({
-      id: Math.random().toString(),
-      type: 'info',
-      title: `Applied Theme: ${theme.replace('-', ' ').toUpperCase()}`
-    });
-  };
+  useEffect(() => {
+    setCurrentSettings(settings);
+  }, [settings]);
 
-  const handleToggleSound = (enabled: boolean) => {
-    sounds.setEnabled(enabled);
-    const updated = { ...currentSettings, soundEffects: enabled };
-    setCurrentSettings(updated);
-    onSaveSettings(updated);
-  };
-
-  const handleVolumeChange = (vol: number) => {
-    sounds.setVolume(vol);
-    const updated = { ...currentSettings, soundVolume: vol };
-    setCurrentSettings(updated);
-    onSaveSettings(updated);
-  };
+  useEffect(() => {
+    if (window.galaxy?.getAppVersion) {
+      window.galaxy.getAppVersion().then((v) => {
+        if (v) setAppVersion(v.replace(/^v/i, ''));
+      }).catch(() => {});
+    }
+    if (window.galaxy?.getSystemSpecs) {
+      window.galaxy.getSystemSpecs().then((specs) => {
+        setSystemSpecs(specs);
+      }).catch((err) => console.error('Failed to get system specs:', err));
+    }
+  }, []);
 
   const handleRamChange = (max: number) => {
     const updated = { ...currentSettings, defaultRamMax: max };
@@ -95,372 +87,536 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   };
 
   return (
-    <div className="flex-1 h-full overflow-y-auto p-6 space-y-6 select-none bg-galaxy-950/40">
-      <div>
-        <h2 className="text-xl font-display font-bold text-white tracking-wide">
-          Launcher Configuration & Settings
-        </h2>
-        <p className="text-xs text-slate-400">
-          Fine-tune Java engines, memory thresholds, cosmic aesthetics, and system preferences.
-        </p>
+    <div className="flex-1 h-full overflow-y-auto p-6 md:p-8 space-y-6 select-none bg-galaxy-950/40 animate-in fade-in duration-200 custom-scrollbar">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-white/[0.06]">
+        <div className="space-y-1">
+          <div className="flex items-center space-x-3">
+            <div className="p-2 rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-300">
+              <SettingsIcon className="w-5 h-5" />
+            </div>
+            <h1 className="text-2xl font-display font-extrabold text-white tracking-tight">
+              Launcher Engine Configuration
+            </h1>
+          </div>
+          <p className="text-xs text-slate-400">
+            Configure system memory thresholds, JVM execution engines, Minecraft resolutions, and update channels.
+          </p>
+        </div>
+
+        <div className="flex items-center space-x-2 shrink-0">
+          <span className="text-xs font-mono font-semibold px-3 py-1 rounded-xl bg-purple-500/15 text-purple-300 border border-purple-500/30">
+            Galaxy Core v{appVersion}
+          </span>
+        </div>
       </div>
 
-      <div className="max-w-3xl space-y-6">
-        {/* THEMES & VISUALS */}
-        <div className="p-5 rounded-2xl bg-galaxy-900/60 border border-white/[0.08] space-y-4">
-          <div className="flex items-center space-x-2">
-            <Palette className="w-4 h-4 text-purple-400" />
-            <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">Cosmic Visual Themes</h3>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-            {[
-              { id: 'nebula-purple', name: 'Nebula Purple', color: 'from-purple-600 to-indigo-700', border: 'border-purple-500' },
-              { id: 'supernova-cyan', name: 'Supernova Cyan', color: 'from-cyan-500 to-blue-600', border: 'border-cyan-500' },
-              { id: 'solar-gold', name: 'Solar Flare', color: 'from-amber-500 to-orange-600', border: 'border-amber-500' },
-              { id: 'deep-void', name: 'Deep Void', color: 'from-indigo-900 to-slate-900', border: 'border-indigo-500' },
-              { id: 'emerald-aurora', name: 'Emerald Aurora', color: 'from-emerald-500 to-teal-700', border: 'border-emerald-500' },
-            ].map((th) => {
-              const isSelected = currentSettings.theme === th.id;
-              return (
-                <button
-                  key={th.id}
-                  onClick={() => handleThemeChange(th.id as any)}
-                  className={`p-3 rounded-xl border text-left transition-all ${
-                    isSelected
-                      ? `${th.border} bg-white/[0.08] shadow-glow-sm`
-                      : 'border-white/[0.06] bg-black/30 hover:border-white/[0.15]'
-                  }`}
-                >
-                  <div className={`w-full h-8 rounded-lg bg-gradient-to-r ${th.color} mb-2 flex items-center justify-center`}>
-                    {isSelected && <Check className="w-4 h-4 text-white" />}
-                  </div>
-                  <div className="text-xs font-semibold text-slate-200 truncate">{th.name}</div>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Background animations toggle */}
-          <div className="pt-2 flex items-center justify-between">
-            <div>
-              <div className="text-xs font-semibold text-slate-200">Interactive Starfield & Nebula</div>
-              <div className="text-[11px] text-slate-400">GPU accelerated cosmic background particles</div>
-            </div>
-            <button
-              onClick={() => {
-                const updated = { ...currentSettings, backgroundAnimation: !currentSettings.backgroundAnimation };
-                setCurrentSettings(updated);
-                onSaveSettings(updated);
-              }}
-              className={`w-10 h-6 flex items-center rounded-full p-0.5 transition-colors ${
-                currentSettings.backgroundAnimation ? 'bg-purple-600' : 'bg-slate-700'
-              }`}
-            >
-              <div className={`w-5 h-5 rounded-full bg-white transition-transform ${
-                currentSettings.backgroundAnimation ? 'translate-x-4' : 'translate-x-0'
-              }`} />
-            </button>
-          </div>
-        </div>
-
-        {/* AUDIO ENGINE */}
-        <div className="p-5 rounded-2xl bg-galaxy-900/60 border border-white/[0.08] space-y-4">
-          <div className="flex items-center space-x-2">
-            <Volume2 className="w-4 h-4 text-cyan-400" />
-            <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">Sound Effects</h3>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-xs font-semibold text-slate-200">UI Audio Feedback</div>
-              <div className="text-[11px] text-slate-400">Futuristic sci-fi sound effects on launch and clicks</div>
-            </div>
-            <button
-              onClick={() => handleToggleSound(!currentSettings.soundEffects)}
-              className={`w-10 h-6 flex items-center rounded-full p-0.5 transition-colors ${
-                currentSettings.soundEffects ? 'bg-cyan-600' : 'bg-slate-700'
-              }`}
-            >
-              <div className={`w-5 h-5 rounded-full bg-white transition-transform ${
-                currentSettings.soundEffects ? 'translate-x-4' : 'translate-x-0'
-              }`} />
-            </button>
-          </div>
-
-          {currentSettings.soundEffects && (
-            <div className="space-y-1.5 pt-1">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-300">Volume</span>
-                <span className="font-mono text-cyan-400 font-bold">{Math.round(currentSettings.soundVolume * 100)}%</span>
+      {/* Responsive 2-Column Full Width Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
+        {/* =========================================================================
+            LEFT COLUMN: Engine, Performance, Resolution & Storage
+           ========================================================================= */}
+        <div className="space-y-6">
+          {/* GLOBAL MEMORY ALLOCATION */}
+          <div className="p-6 rounded-3xl bg-galaxy-900/70 border border-white/[0.08] backdrop-blur-md space-y-5 shadow-xl">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center space-x-2.5 min-w-0">
+                <div className="p-2 rounded-xl bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 shrink-0">
+                  <HardDrive className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-sm font-bold text-slate-100 truncate">Global Memory Allocation</h3>
+                  <p className="text-[11px] text-slate-400 truncate">Default RAM assigned to newly created Minecraft instances</p>
+                </div>
               </div>
+              <div className="px-3 py-1 rounded-xl bg-emerald-500/15 border border-emerald-500/30 font-mono text-emerald-300 text-xs font-bold shadow-glow-sm shrink-0 whitespace-nowrap">
+                {currentSettings.defaultRamMax} MB ({(currentSettings.defaultRamMax / 1024).toFixed(1)} GB)
+              </div>
+            </div>
+
+            {/* System Hardware Detection Banner */}
+            {systemSpecs && (
+              <div className="p-3.5 rounded-2xl bg-black/40 border border-emerald-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-glow-sm min-w-0">
+                <div className="flex items-center space-x-3 min-w-0 flex-1">
+                  <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0">
+                    <Cpu className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center space-x-2 min-w-0">
+                      <span className="text-xs font-bold text-slate-100 truncate">{systemSpecs.cpuModel}</span>
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0 whitespace-nowrap">
+                        {systemSpecs.cpuCores} Cores
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-slate-400 truncate">
+                      Total System Memory: <span className="text-slate-200 font-semibold">{(systemSpecs.totalMemoryMb / 1024).toFixed(1)} GB</span> • Free: <span className="text-slate-200">{(systemSpecs.freeMemoryMb / 1024).toFixed(1)} GB</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="text-left sm:text-right shrink-0 sm:pl-3 whitespace-nowrap">
+                  <span className="text-[10px] uppercase font-bold text-emerald-400 block tracking-wider">Recommended</span>
+                  <span className="text-xs font-mono font-bold text-white bg-emerald-500/20 border border-emerald-500/40 px-2 py-0.5 rounded-md inline-block">
+                    {systemSpecs.recommendedRamMb} MB ({(systemSpecs.recommendedRamMb / 1024).toFixed(0)} GB)
+                  </span>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-3 pt-1">
               <input
                 type="range"
-                min="0"
-                max="1"
-                step="0.05"
-                value={currentSettings.soundVolume}
-                onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
-                className="w-full accent-cyan-500"
+                min="1024"
+                max="16384"
+                step="512"
+                value={currentSettings.defaultRamMax}
+                onChange={(e) => handleRamChange(parseInt(e.target.value, 10))}
+                className="w-full accent-emerald-400 cursor-pointer h-2 bg-black/50 rounded-lg"
               />
-            </div>
-          )}
-        </div>
 
-        {/* MEMORY & PERFORMANCE */}
-        <div className="p-5 rounded-2xl bg-galaxy-900/60 border border-white/[0.08] space-y-4">
-          <div className="flex items-center space-x-2">
-            <HardDrive className="w-4 h-4 text-emerald-400" />
-            <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">Global Memory Allocation</h3>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-300">Default Maximum RAM for Instances</span>
-              <span className="font-mono text-emerald-400 font-bold">{currentSettings.defaultRamMax} MB ({(currentSettings.defaultRamMax / 1024).toFixed(1)} GB)</span>
-            </div>
-            <input
-              type="range"
-              min="1024"
-              max="16384"
-              step="512"
-              value={currentSettings.defaultRamMax}
-              onChange={(e) => handleRamChange(parseInt(e.target.value, 10))}
-              className="w-full accent-emerald-500"
-            />
-            <div className="flex justify-between text-[10px] font-mono text-slate-500">
-              <span>2 GB (Vanilla)</span>
-              <span>4 GB (Light Mods)</span>
-              <span>8 GB (Modpacks)</span>
-              <span>16 GB</span>
-            </div>
-          </div>
-        </div>
-
-        {/* JAVA RUNTIME DETECTOR */}
-        <div className="p-5 rounded-2xl bg-galaxy-900/60 border border-white/[0.08] space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Cpu className="w-4 h-4 text-purple-400" />
-              <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">Detected Java Runtimes</h3>
-            </div>
-            <button
-              onClick={handleScanJavaClick}
-              disabled={scanning}
-              className="px-3 py-1.5 rounded-xl bg-purple-600/20 hover:bg-purple-600 text-purple-300 hover:text-white border border-purple-500/30 text-xs font-semibold flex items-center space-x-1.5 transition-all"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${scanning ? 'animate-spin' : ''}`} />
-              <span>Scan System</span>
-            </button>
-          </div>
-
-          <div className="space-y-2">
-            {detectedJava.length === 0 ? (
-              <div className="p-4 rounded-xl bg-black/30 text-xs text-slate-400 text-center">
-                No Java runtimes found on standard paths. Click "Scan System" or add a path.
+              {/* Quick Preset Buttons */}
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 pt-1">
+                {[
+                  { label: '2 GB', desc: 'Vanilla', val: 2048 },
+                  { label: '4 GB', desc: 'Standard', val: 4096 },
+                  { label: '6 GB', desc: 'Modded', val: 6144 },
+                  { label: '8 GB', desc: 'Modpacks', val: 8192 },
+                  { label: '12 GB', desc: 'Shaders', val: 12288 },
+                  { label: '16 GB', desc: 'Extreme', val: 16384 }
+                ].map((preset) => {
+                  const isActive = currentSettings.defaultRamMax === preset.val;
+                  const isRec = preset.val === (systemSpecs?.recommendedRamMb || 4096);
+                  return (
+                    <button
+                      key={preset.val}
+                      onClick={() => {
+                        sounds.playClick();
+                        handleRamChange(preset.val);
+                      }}
+                      title={isRec ? `Recommended for your system (${preset.label})` : `${preset.label} RAM Preset (${preset.desc})`}
+                      className={`p-1.5 sm:p-2 rounded-xl text-center border transition-all min-w-0 overflow-hidden ${
+                        isActive
+                          ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-200 shadow-glow-sm'
+                          : isRec
+                          ? 'bg-emerald-500/5 border-emerald-500/30 text-slate-300 hover:border-emerald-500/50'
+                          : 'bg-black/30 hover:bg-black/50 border-white/[0.06] text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      <div className="text-xs font-bold font-mono truncate">{preset.label}</div>
+                      <div className={`text-[10px] truncate ${isRec ? 'text-emerald-400 font-semibold' : 'text-slate-500'}`}>
+                        {isRec ? '★ Rec.' : preset.desc}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
-            ) : (
-              detectedJava.map((java, idx) => (
-                <div
-                  key={idx}
-                  className="p-3 rounded-xl bg-black/40 border border-white/[0.06] flex items-center justify-between text-xs font-mono"
+            </div>
+
+            {/* Default Resolution Selector */}
+            <div className="pt-3 border-t border-white/[0.06] space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center space-x-2 min-w-0">
+                  <Monitor className="w-4 h-4 text-cyan-400 shrink-0" />
+                  <span className="text-xs font-semibold text-slate-200 truncate">Default Game Resolution</span>
+                </div>
+                <span className="text-xs font-mono font-bold text-cyan-300 bg-cyan-500/15 border border-cyan-500/30 px-2 py-0.5 rounded-lg shrink-0 whitespace-nowrap">
+                  {currentSettings.defaultFullscreen ? 'Fullscreen' : `${currentSettings.defaultResolutionWidth || 1920} × ${currentSettings.defaultResolutionHeight || 1080}`}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {[
+                  { label: '1440p (2K QHD)', width: 2560, height: 1440, desc: 'Crisp QHD' },
+                  { label: '1080p (Full HD)', width: 1920, height: 1080, desc: 'Recommended' },
+                  { label: '900p (HD+)', width: 1600, height: 900, desc: 'Balanced' },
+                  { label: '720p (HD Ready)', width: 1280, height: 720, desc: 'High FPS' }
+                ].map((res) => {
+                  const isCur = !currentSettings.defaultFullscreen && (currentSettings.defaultResolutionWidth || 1920) === res.width && (currentSettings.defaultResolutionHeight || 1080) === res.height;
+                  return (
+                    <button
+                      key={`${res.width}x${res.height}`}
+                      onClick={() => {
+                        sounds.playClick();
+                        const updated = {
+                          ...currentSettings,
+                          defaultResolutionWidth: res.width,
+                          defaultResolutionHeight: res.height,
+                          defaultFullscreen: false
+                        };
+                        setCurrentSettings(updated);
+                        onSaveSettings(updated);
+                      }}
+                      title={`${res.label} - ${res.desc}`}
+                      className={`p-1.5 sm:p-2 rounded-xl border text-center transition-all min-w-0 overflow-hidden ${
+                        isCur
+                          ? 'border-cyan-500 bg-cyan-500/20 text-cyan-200 font-bold shadow-glow-sm'
+                          : 'border-white/[0.06] bg-black/30 hover:bg-black/50 text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      <div className="text-xs font-bold font-mono truncate">{res.width} × {res.height}</div>
+                      <div className={`text-[10px] truncate ${isCur ? 'text-cyan-300 font-semibold' : 'text-slate-500'}`}>{res.desc}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* STORAGE & DATA PATHS */}
+          <div className="p-6 rounded-3xl bg-galaxy-900/70 border border-white/[0.08] backdrop-blur-md space-y-4 shadow-xl">
+            <div className="flex items-center space-x-2.5">
+              <div className="p-2 rounded-xl bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+                <FolderOpen className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-100">Storage & Game Directory</h3>
+                <p className="text-[11px] text-slate-400">Manage launcher data, instance folders, logs, and mods</p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-black/40 border border-white/[0.06] flex items-center justify-between gap-4">
+              <div className="space-y-0.5 min-w-0">
+                <div className="text-xs font-semibold text-slate-200">Open Launcher Data Directory</div>
+                <div className="text-[11px] text-slate-400 truncate">Instances, world saves, screenshots & logs</div>
+              </div>
+              <button
+                onClick={handleOpenFolder}
+                className="px-4 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.1] text-xs font-semibold text-slate-200 flex items-center space-x-1.5 transition-all shrink-0 hover:scale-105 active:scale-95"
+              >
+                <FolderOpen className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Open Folder</span>
+              </button>
+            </div>
+
+            {onOpenOnboarding && (
+              <div className="p-4 rounded-2xl bg-black/40 border border-white/[0.06] flex items-center justify-between gap-4">
+                <div className="space-y-0.5">
+                  <div className="text-xs font-semibold text-slate-200">Re-run Welcome Wizard</div>
+                  <div className="text-[11px] text-slate-400">Revisit the launcher setup & account onboarding</div>
+                </div>
+                <button
+                  onClick={() => {
+                    sounds.playClick();
+                    onOpenOnboarding();
+                  }}
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600/30 to-cyan-500/30 hover:from-purple-600/50 hover:to-cyan-500/50 border border-purple-500/40 text-xs font-semibold text-purple-200 flex items-center space-x-1.5 transition-all shrink-0 hover:scale-105 active:scale-95"
                 >
-                  <div className="space-y-0.5">
-                    <div className="flex items-center space-x-2">
-                      <span className="font-bold text-slate-100 font-sans">Java {java.majorVersion}</span>
-                      <span className="text-[10px] bg-purple-500/15 text-purple-300 px-2 py-0.2 rounded border border-purple-500/30 font-sans">
-                        {java.vendor} ({java.arch})
-                      </span>
-                      {java.isDefault && (
-                        <span className="text-[10px] bg-emerald-500/15 text-emerald-300 px-2 py-0.2 rounded border border-emerald-500/30 font-sans">
-                          Default
+                  <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Setup Wizard</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* DANGER ZONE / CLEANUP */}
+          <div className="p-6 rounded-3xl bg-rose-950/20 border border-rose-500/30 space-y-4 shadow-xl">
+            <div className="flex items-center space-x-2.5">
+              <div className="p-2 rounded-xl bg-rose-500/15 text-rose-300 border border-rose-500/30">
+                <Trash2 className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-rose-300">Data Cleanup & Reset</h3>
+                <p className="text-[11px] text-rose-300/70">Wipe local launcher cache or reset all installations</p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-1">
+              <div className="text-xs text-slate-300 leading-relaxed max-w-sm">
+                Completely deletes all local instances, downloaded mods, shaders, and configs from disk.
+              </div>
+              <button
+                onClick={() => {
+                  sounds.playClick();
+                  setShowWipeModal(true);
+                }}
+                className="px-4 py-2 rounded-xl bg-rose-600/30 hover:bg-rose-600/60 border border-rose-500/50 text-xs font-semibold text-rose-200 flex items-center space-x-1.5 transition-all shrink-0 hover:scale-105 active:scale-95"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                <span>Wipe All Data</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* =========================================================================
+            RIGHT COLUMN: Java Runtimes, Updates, Cloud & Telemetry
+           ========================================================================= */}
+        <div className="space-y-6">
+          {/* DETECTED JAVA RUNTIMES */}
+          <div className="p-6 rounded-3xl bg-galaxy-900/70 border border-white/[0.08] backdrop-blur-md space-y-4 shadow-xl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2.5">
+                <div className="p-2 rounded-xl bg-purple-500/15 text-purple-300 border border-purple-500/30">
+                  <Cpu className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-100">Detected Java Runtimes</h3>
+                  <p className="text-[11px] text-slate-400">Auto-detected JVM installations across your system</p>
+                </div>
+              </div>
+
+              <button
+                onClick={handleScanJavaClick}
+                disabled={scanning}
+                className="px-3.5 py-1.5 rounded-xl bg-purple-600/20 hover:bg-purple-600 text-purple-300 hover:text-white border border-purple-500/40 text-xs font-semibold flex items-center space-x-1.5 transition-all shadow-glow-sm"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${scanning ? 'animate-spin' : ''}`} />
+                <span>{scanning ? 'Scanning...' : 'Scan System'}</span>
+              </button>
+            </div>
+
+            <div className="space-y-2.5 max-h-64 overflow-y-auto pr-1">
+              {detectedJava.length === 0 ? (
+                <div className="p-5 rounded-2xl bg-black/40 border border-white/[0.06] text-xs text-slate-400 text-center space-y-2">
+                  <p>No Java runtimes found in standard paths.</p>
+                  <p className="text-[11px] text-slate-500">Galaxy automatically provisions isolated runtime binaries when launching instances.</p>
+                </div>
+              ) : (
+                detectedJava.map((java, idx) => (
+                  <div
+                    key={idx}
+                    className="p-3.5 rounded-2xl bg-black/40 border border-white/[0.06] hover:border-white/[0.12] transition-colors space-y-1.5"
+                  >
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center space-x-2 flex-wrap gap-y-1 min-w-0">
+                        <span className="font-bold text-sm text-slate-100">Java {java.majorVersion}</span>
+                        <span className="text-[10px] bg-purple-500/15 text-purple-300 px-2 py-0.5 rounded-md border border-purple-500/30 font-mono whitespace-nowrap shrink-0">
+                          {java.vendor} ({java.arch})
                         </span>
-                      )}
+                        {java.isDefault && (
+                          <span className="text-[10px] bg-emerald-500/15 text-emerald-300 px-2 py-0.5 rounded-md border border-emerald-500/30 font-semibold whitespace-nowrap shrink-0">
+                            Default
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[10px] font-mono text-slate-500 shrink-0">Ready</span>
                     </div>
-                    <div className="text-[11px] text-slate-500 truncate max-w-md">
+                    <div className="text-[11px] text-slate-400 font-mono truncate bg-black/30 px-2.5 py-1 rounded-lg border border-white/[0.04]">
                       {java.path}
                     </div>
                   </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* SOFTWARE UPDATES & VERSION */}
+          <div className="p-6 rounded-3xl bg-galaxy-900/70 border border-white/[0.08] backdrop-blur-md space-y-4 shadow-xl">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center space-x-2.5 min-w-0">
+                <div className="p-2 rounded-xl bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 shrink-0">
+                  <Sparkles className="w-4 h-4" />
                 </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* STORAGE & DIRECTORIES */}
-        <div className="p-5 rounded-2xl bg-galaxy-900/60 border border-white/[0.08] space-y-4">
-          <div className="flex items-center space-x-2">
-            <FolderOpen className="w-4 h-4 text-cyan-400" />
-            <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">Storage & Data</h3>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-xs font-semibold text-slate-200">Open Launcher Data Folder</div>
-              <div className="text-[11px] text-slate-400">View instances, logs, and config files on disk</div>
-            </div>
-            <button
-              onClick={handleOpenFolder}
-              className="px-4 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.1] text-xs font-semibold text-slate-200 flex items-center space-x-1.5 transition-colors"
-            >
-              <FolderOpen className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Open Folder</span>
-            </button>
-          </div>
-
-          {onOpenOnboarding && (
-            <div className="pt-3 border-t border-white/[0.06] flex items-center justify-between">
-              <div>
-                <div className="text-xs font-semibold text-slate-200">Re-run Welcome & Setup Wizard</div>
-                <div className="text-[11px] text-slate-400">Revisit the launcher introduction and personalization wizard</div>
-              </div>
-              <button
-                onClick={() => {
-                  sounds.playClick();
-                  onOpenOnboarding();
-                }}
-                className="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600/30 to-cyan-500/30 hover:from-purple-600/50 hover:to-cyan-500/50 border border-purple-500/40 text-xs font-semibold text-purple-200 flex items-center space-x-1.5 transition-all"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-                <span>Open Setup Wizard</span>
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* SOFTWARE UPDATES & VERSION */}
-        <div className="p-5 rounded-2xl bg-galaxy-900/60 border border-white/[0.08] space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Sparkles className="w-4 h-4 text-cyan-400" />
-              <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">Software Updates & Version</h3>
-            </div>
-            <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-lg bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
-              v1.0.0 Stable
-            </span>
-          </div>
-
-          <div className="p-4 rounded-xl bg-black/40 border border-white/[0.06] space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="space-y-0.5">
-                <div className="font-semibold text-xs text-slate-200 flex items-center space-x-2">
-                  <span>Galaxy Auto-Update Engine</span>
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <div className="min-w-0">
+                  <h3 className="text-sm font-bold text-slate-100 truncate">Software Updates & Version</h3>
+                  <p className="text-[11px] text-slate-400 truncate">Automatic updates, version sync, and release channels</p>
                 </div>
-                <p className="text-[11px] text-slate-400 leading-relaxed">
-                  Automatically detects and installs new launcher features, security patches, and performance optimizations.
-                </p>
+              </div>
+              <span className="text-xs font-mono font-bold px-3 py-1 rounded-xl bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 shadow-glow-sm shrink-0 whitespace-nowrap">
+                v{appVersion} Stable
+              </span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-black/40 border border-white/[0.06] space-y-3.5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <div className="font-semibold text-xs text-slate-200 flex items-center space-x-2">
+                    <span>Galaxy Auto-Update Engine</span>
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Automatically checks GitHub for new launcher releases & updates.
+                  </p>
+                </div>
+
+                <button
+                  onClick={async () => {
+                    sounds.playClick();
+                    onShowToast({
+                      id: Math.random().toString(),
+                      type: 'info',
+                      title: 'Checking for updates...',
+                      message: 'Connecting to update channels.'
+                    });
+                    try {
+                      const res = await window.galaxy?.checkForUpdates();
+                      if (res?.status === 'available') {
+                        sounds.playSuccess();
+                        onShowToast({
+                          id: Math.random().toString(),
+                          type: 'success',
+                          title: `Update v${res.latestVersion} Available!`,
+                          message: 'Click Download & Install to update.'
+                        });
+                      } else if (res?.status === 'not-available') {
+                        sounds.playSuccess();
+                        onShowToast({
+                          id: Math.random().toString(),
+                          type: 'info',
+                          title: 'You are on the latest version',
+                          message: `Galaxy Launcher v${res?.currentVersion || appVersion} is up to date.`
+                        });
+                      }
+                    } catch (err: any) {
+                      console.warn(err);
+                    }
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-cyan-500 hover:from-purple-500 hover:to-cyan-400 text-white font-semibold text-xs shadow-glow-sm hover:shadow-glow-md flex items-center justify-center space-x-1.5 transition-all shrink-0 hover:scale-105 active:scale-95"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Check for Updates</span>
+                </button>
               </div>
 
-              <button
-                onClick={async () => {
-                  sounds.playClick();
-                  onShowToast({
-                    id: Math.random().toString(),
-                    type: 'info',
-                    title: 'Checking for updates...',
-                    message: 'Connecting to update channels.'
-                  });
-                  try {
-                    const res = await window.galaxy?.checkForUpdates();
-                    if (res?.status === 'available') {
-                      sounds.playSuccess();
+              {/* Auto Check Toggle */}
+              <div className="pt-2.5 border-t border-white/[0.06] flex items-center justify-between">
+                <div>
+                  <div className="text-xs font-medium text-slate-300">Auto-check on startup</div>
+                  <div className="text-[10px] text-slate-500">Silently check for new versions whenever Galaxy Launcher opens</div>
+                </div>
+                <button
+                  onClick={() => {
+                    const updated = {
+                      ...currentSettings,
+                      autoCheckUpdates: currentSettings.autoCheckUpdates === false ? true : false
+                    };
+                    setCurrentSettings(updated);
+                    onSaveSettings(updated);
+                  }}
+                  className={`w-9 h-5 flex items-center rounded-full p-0.5 transition-colors ${
+                    currentSettings.autoCheckUpdates !== false ? 'bg-cyan-600 shadow-glow-sm' : 'bg-slate-700'
+                  }`}
+                >
+                  <div className={`w-4 h-4 rounded-full bg-white transition-transform ${
+                    currentSettings.autoCheckUpdates !== false ? 'translate-x-4' : 'translate-x-0'
+                  }`} />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* GALAXY CLOUD SYNC */}
+          <div className="p-6 rounded-3xl bg-galaxy-900/70 border border-white/[0.08] backdrop-blur-md space-y-4 shadow-xl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2.5">
+                <div className="p-2 rounded-xl bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+                  <Cloud className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-100">Galaxy Cloud Sync</h3>
+                  <p className="text-[11px] text-slate-400">Cross-device instance backup & cloud synchronization</p>
+                </div>
+              </div>
+              <span className="text-[10px] font-mono font-bold uppercase px-2.5 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+                5 GB Free
+              </span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-black/40 border border-white/[0.06] space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs font-semibold text-slate-200">Enable Cloud Backups</div>
+                  <div className="text-[11px] text-slate-400">
+                    Automatically sync instances, configs, and friends to Galaxy Cloud
+                  </div>
+                </div>
+                <button
+                  onClick={async () => {
+                    sounds.playSwitch();
+                    if (window.galaxy) {
+                      const state = await window.galaxy.getCloudSyncState();
+                      const updated = await window.galaxy.toggleCloudSync(!state.enabled);
                       onShowToast({
-                        id: Math.random().toString(),
-                        type: 'success',
-                        title: `Update v${res.latestVersion} Available!`,
-                        message: 'Click Download & Install to update.'
-                      });
-                    } else if (res?.status === 'not-available') {
-                      sounds.playSuccess();
-                      onShowToast({
-                        id: Math.random().toString(),
-                        type: 'info',
-                        title: 'You are on the latest version',
-                        message: 'Galaxy Launcher v1.0.0 is up to date.'
+                        type: updated.enabled ? 'success' : 'info',
+                        title: updated.enabled ? 'Galaxy Cloud Enabled' : 'Galaxy Cloud Disabled'
                       });
                     }
-                  } catch (err: any) {
-                    console.warn(err);
-                  }
-                }}
-                className="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-cyan-500 hover:from-purple-500 hover:to-cyan-400 text-white font-semibold text-xs shadow-glow-sm flex items-center justify-center space-x-1.5 transition-all shrink-0"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                <span>Check for Updates</span>
-              </button>
-            </div>
-
-            {/* Auto Check Toggle */}
-            <div className="pt-2 border-t border-white/[0.06] flex items-center justify-between">
-              <div>
-                <div className="text-xs font-medium text-slate-300">Auto-check on startup</div>
-                <div className="text-[10px] text-slate-500">Silently check for new versions whenever Galaxy Launcher opens</div>
+                  }}
+                  className="px-3.5 py-1.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-xs font-bold transition-all"
+                >
+                  Manage in Cloud Tab
+                </button>
               </div>
-              <button
-                onClick={() => {
-                  const updated = {
-                    ...currentSettings,
-                    autoCheckUpdates: currentSettings.autoCheckUpdates === false ? true : false
-                  };
-                  setCurrentSettings(updated);
-                  onSaveSettings(updated);
-                }}
-                className={`w-9 h-5 flex items-center rounded-full p-0.5 transition-colors ${
-                  currentSettings.autoCheckUpdates !== false ? 'bg-cyan-600' : 'bg-slate-700'
-                }`}
-              >
-                <div className={`w-4 h-4 rounded-full bg-white transition-transform ${
-                  currentSettings.autoCheckUpdates !== false ? 'translate-x-4' : 'translate-x-0'
-                }`} />
-              </button>
             </div>
           </div>
-        </div>
 
-        {/* DANGER ZONE / CLEANUP & UNINSTALL */}
-        <div className="p-5 rounded-2xl bg-rose-950/20 border border-rose-500/30 space-y-4">
-          <div className="flex items-center space-x-2">
-            <Trash2 className="w-4 h-4 text-rose-400" />
-            <h3 className="text-xs font-bold text-rose-300 uppercase tracking-wider">Uninstallation & Data Cleanup</h3>
-          </div>
-
-          <div className="text-xs text-slate-300 leading-relaxed space-y-1">
-            <p>
-              When uninstalling Galaxy Launcher via Windows <strong>Apps & Features</strong> or <strong>Uninstall Galaxy Launcher.exe</strong>, you will be prompted with a choice to completely delete all instances, downloaded mods, shaders, and resource packs.
-            </p>
-          </div>
-
-          <div className="pt-2 border-t border-rose-500/20 flex items-center justify-between">
-            <div>
-              <div className="text-xs font-semibold text-rose-200">Wipe All Launcher Data & Instances</div>
-              <div className="text-[11px] text-rose-300/70">Completely delete all local instances, mods, and configuration files</div>
+          {/* COSMIC SYSTEM & ENGINE TELEMETRY */}
+          <div className="p-6 rounded-3xl bg-galaxy-900/70 border border-white/[0.08] backdrop-blur-md space-y-4 shadow-xl">
+            <div className="flex items-center space-x-2.5">
+              <div className="p-2 rounded-xl bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                <Gauge className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-100">System & Engine Telemetry</h3>
+                <p className="text-[11px] text-slate-400">Hardware environment and runtime status</p>
+              </div>
             </div>
-            <button
-              onClick={async () => {
-                const confirmed = window.confirm(
-                  'Are you sure you want to completely delete all Galaxy Launcher instances, downloaded mods, shaders, resource packs, and player settings from your PC?'
-                );
-                if (confirmed) {
-                  sounds.playError();
-                  await window.galaxy?.wipeAllData();
-                  onShowToast({
-                    id: Math.random().toString(),
-                    type: 'info',
-                    title: 'All launcher data wiped',
-                    message: 'All instances, mods, and configs have been removed.'
-                  });
-                  setTimeout(() => window.location.reload(), 1500);
-                }
-              }}
-              className="px-4 py-2 rounded-xl bg-rose-600/30 hover:bg-rose-600/50 border border-rose-500/50 text-xs font-semibold text-rose-200 flex items-center space-x-1.5 transition-colors"
-            >
-              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-              <span>Wipe All Data</span>
-            </button>
+
+            <div className="grid grid-cols-2 gap-3 pt-1">
+              <div className="p-3.5 rounded-2xl bg-black/40 border border-white/[0.06] space-y-1">
+                <div className="text-[10px] text-slate-500 uppercase tracking-wider font-mono">Platform OS</div>
+                <div className="text-xs font-bold text-slate-200">Windows (x64)</div>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-black/40 border border-white/[0.06] space-y-1">
+                <div className="text-[10px] text-slate-500 uppercase tracking-wider font-mono">Electron Core</div>
+                <div className="text-xs font-bold text-slate-200">v34.5.8</div>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-black/40 border border-white/[0.06] space-y-1">
+                <div className="text-[10px] text-slate-500 uppercase tracking-wider font-mono">Minecraft API</div>
+                <div className="text-xs font-bold text-emerald-300 flex items-center space-x-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>Mojang & Modrinth</span>
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-black/40 border border-white/[0.06] space-y-1">
+                <div className="text-[10px] text-slate-500 uppercase tracking-wider font-mono">Graphics Mode</div>
+                <div className="text-xs font-bold text-cyan-300">GPU Accelerated</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Wipe All Data Confirm Modal */}
+      <ConfirmModal
+        isOpen={showWipeModal}
+        title="Wipe All Launcher Data"
+        subtitle="Full Local Reset"
+        type="danger"
+        confirmText="Wipe Everything"
+        cancelText="Cancel"
+        isLoading={isWiping}
+        icon={<Trash2 className="w-5 h-5 text-rose-300" />}
+        description={
+          <div className="space-y-3">
+            <p>
+              Are you sure you want to completely delete all Galaxy Launcher instances, downloaded mods, shaders, resource packs, and configurations from your PC?
+            </p>
+            <p className="text-[11px] text-slate-400">
+              The launcher directory will be cleanly recreated and restarted in its fresh initial state.
+            </p>
+          </div>
+        }
+        onConfirm={async () => {
+          setIsWiping(true);
+          try {
+            await window.galaxy?.wipeAllData();
+            setShowWipeModal(false);
+            onShowToast({
+              id: Math.random().toString(),
+              type: 'info',
+              title: 'All launcher data wiped',
+              message: 'All instances, mods, and configs have been removed.'
+            });
+            setTimeout(() => window.location.reload(), 1500);
+          } finally {
+            setIsWiping(false);
+          }
+        }}
+        onClose={() => setShowWipeModal(false)}
+      />
     </div>
   );
 };

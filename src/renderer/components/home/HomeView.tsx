@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Play,
   Square,
@@ -8,18 +8,58 @@ import {
   Cpu,
   Layers,
   ChevronRight,
+  ChevronDown,
   Plus,
   FolderOpen,
   Settings as SettingsIcon,
   ShieldCheck,
   Flame,
   CheckCircle2,
-  RefreshCw
+  RefreshCw,
+  Palette,
+  Search,
+  SlidersHorizontal,
+  Clock,
+  LayoutGrid,
+  List,
+  Boxes,
+  ArrowUpDown,
+  X,
+  Compass,
+  Users,
+  Gamepad2,
+  FolderUp,
+  ArrowRight,
+  Download,
+  Check,
+  Loader2,
+  Activity,
+  Eye,
+  Star,
+  Trash2,
+  Trophy,
+  Cloud,
+  Shield,
+  Award,
+  ChevronsDown,
+  ChevronUp,
+  UserCheck,
+  Server,
+  Rocket,
+  Camera,
+  Share2,
+  Copy
 } from 'lucide-react';
-import { Instance, Account, LaunchProgress } from '../../types';
+import { Instance, Account, LaunchProgress, Mod, Achievement, AchievementStats, CloneInstanceOptions } from '../../types';
 import { sounds } from '../../services/soundEngine';
+import { InstanceIconRenderer, IconEditorModal } from '../instances/instanceIcons';
+import { ConfirmModal } from '../common/ConfirmModal';
+import { ShareInstanceModal } from '../instances/ShareInstanceModal';
+import { CloneInstanceModal } from '../instances/CloneInstanceModal';
+import { TabType } from '../layout/Sidebar';
 
 interface HomeViewProps {
+  activeTab?: 'home' | 'instances';
   instances: Instance[];
   selectedInstance: Instance | null;
   onSelectInstance: (instance: Instance) => void;
@@ -28,13 +68,20 @@ interface HomeViewProps {
   launchProgress: LaunchProgress | null;
   activeAccount: Account | null;
   onOpenInstanceDetails: (instance: Instance) => void;
-  onCreateInstance: () => void;
+  onCreateInstance: (initialTab?: 'create' | 'share_code' | 'import') => void;
   onOpenFolder: (instance: Instance) => void;
   onOptimizeInstance: (instance: Instance) => void;
+  onUpdateInstance?: (instance: Instance) => Promise<void>;
+  onDeleteInstance?: (id: string) => Promise<void> | void;
+  onCloneInstance?: (id: string, options: CloneInstanceOptions) => Promise<void>;
+  onSelectTab?: (tab: TabType) => void;
+  onNavigateToMarketplace?: (type: 'mod' | 'shader' | 'resourcepack') => void;
+  onShowToast?: (toast: any) => void;
 }
 
 export const HomeView: React.FC<HomeViewProps> = ({
-  instances,
+  activeTab = 'home',
+  instances = [],
   selectedInstance,
   onSelectInstance,
   onLaunch,
@@ -44,13 +91,132 @@ export const HomeView: React.FC<HomeViewProps> = ({
   onOpenInstanceDetails,
   onCreateInstance,
   onOpenFolder,
-  onOptimizeInstance
+  onOptimizeInstance,
+  onUpdateInstance,
+  onDeleteInstance,
+  onCloneInstance,
+  onSelectTab,
+  onNavigateToMarketplace,
+  onShowToast
 }) => {
+  const [editingIconInstance, setEditingIconInstance] = useState<Instance | null>(null);
+  const [deletingInstance, setDeletingInstance] = useState<Instance | null>(null);
+  const [sharingInstance, setSharingInstance] = useState<Instance | null>(null);
+  const [cloningInstance, setCloningInstance] = useState<Instance | null>(null);
+  const [isDeletingLoading, setIsDeletingLoading] = useState(false);
+
+  // Instances tab search & filter state
+  const [searchFilter, setSearchFilter] = useState('');
+  const [selectedLoaderFilter, setSelectedLoaderFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<'recent' | 'name' | 'loader' | 'version'>('recent');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [installedMods, setInstalledMods] = useState<Mod[]>([]);
+  const [instanceDropdownOpen, setInstanceDropdownOpen] = useState(false);
+
+  // Quick Launch & Wheel Navigation state
+  const [showLaunchModal, setShowLaunchModal] = useState(false);
+  const [launchModalSearch, setLaunchModalSearch] = useState('');
+  const lastWheelTimeRef = useRef<number>(0);
+
   const isLaunching = launchProgress && selectedInstance && launchProgress.instanceId === selectedInstance.id;
   const isRunning = selectedInstance?.isRunning;
 
-  const getLoaderColor = (loader: string) => {
-    switch (loader) {
+  // Load installed mods for active selected instance
+  useEffect(() => {
+    if (selectedInstance && window.galaxy?.getMods) {
+      window.galaxy.getMods(selectedInstance.id).then((m) => {
+        setInstalledMods(m || []);
+      }).catch(() => {});
+    }
+  }, [selectedInstance?.id]);
+
+  // Quick Launch Handler (Triggered on Scroll Up in Play Tab)
+  const handleQuickLaunch = () => {
+    if (instances.length === 0) {
+      sounds.playClick();
+      onCreateInstance();
+      return;
+    }
+
+    if (instances.length === 1) {
+      const inst = instances[0];
+      if (inst.isRunning) {
+        sounds.playSwitch();
+        onShowToast?.({
+          type: 'info',
+          title: `"${inst.name}" is already running`
+        });
+        return;
+      }
+      if (isLaunching) return;
+      sounds.playLaunch();
+      onLaunch(inst);
+      onShowToast?.({
+        type: 'success',
+        title: `Launching ${inst.name}...`,
+        message: `Minecraft ${inst.version} (${inst.loader.toUpperCase()})`
+      });
+      return;
+    }
+
+    // Multiple instances present -> open selection prompt window
+    sounds.playSwitch();
+    setShowLaunchModal(true);
+    setLaunchModalSearch('');
+  };
+
+  // Wheel Gesture Navigation for Play Page
+  const handlePlayPageWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    const now = Date.now();
+    if (now - lastWheelTimeRef.current < 400) return;
+
+    // Scroll Down -> Navigate to real Instances tab
+    if (e.deltaY > 35) {
+      lastWheelTimeRef.current = now;
+      sounds.playSwitch();
+      onSelectTab?.('instances');
+    }
+    // Scroll Up -> Quick Launch / Open Selection Prompt
+    else if (e.deltaY < -35) {
+      lastWheelTimeRef.current = now;
+      handleQuickLaunch();
+    }
+  };
+
+  // Wheel Gesture Navigation for Instances Tab
+  const handleInstancesWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    const container = e.currentTarget;
+    const now = Date.now();
+    if (now - lastWheelTimeRef.current < 400) return;
+
+    // If scrolled at the very top and scrolling up -> return to Play
+    if (container.scrollTop <= 0 && e.deltaY < -40) {
+      lastWheelTimeRef.current = now;
+      sounds.playSwitch();
+      onSelectTab?.('home');
+    }
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deletingInstance || !onDeleteInstance) return;
+    setIsDeletingLoading(true);
+    try {
+      await onDeleteInstance(deletingInstance.id);
+      setDeletingInstance(null);
+    } catch (err: any) {
+      onShowToast?.({
+        type: 'error',
+        title: 'Delete Failed',
+        message: err.message || 'Could not delete instance from disk.'
+      });
+    } finally {
+      setIsDeletingLoading(false);
+    }
+  };
+
+  const getLoaderColor = (loader?: string) => {
+    const l = (loader || 'vanilla').toLowerCase();
+    switch (l) {
       case 'fabric':
         return 'from-blue-500/20 to-indigo-500/20 text-blue-300 border-blue-500/30';
       case 'forge':
@@ -64,178 +230,1491 @@ export const HomeView: React.FC<HomeViewProps> = ({
     }
   };
 
-  if (instances.length === 0) {
+  const handleSaveIcon = async (icon: string, background: string) => {
+    if (!editingIconInstance) return;
+    const updated: Instance = {
+      ...editingIconInstance,
+      icon,
+      iconBackground: background
+    };
+    if (onUpdateInstance) {
+      await onUpdateInstance(updated);
+    }
+    setEditingIconInstance(null);
+  };
+
+  // Safe Filtering & Sorting for Instances Tab
+  const filteredAndSortedInstances = instances
+    .filter((i) => {
+      if (!i) return false;
+      const name = (i.name || '').toLowerCase();
+      const ver = (i.version || '').toLowerCase();
+      const ldr = (i.loader || '').toLowerCase();
+      const q = searchFilter.toLowerCase().trim();
+
+      const matchesSearch = !q || name.includes(q) || ver.includes(q) || ldr.includes(q);
+      const matchesLoader = selectedLoaderFilter === 'all' || ldr === selectedLoaderFilter.toLowerCase();
+
+      return matchesSearch && matchesLoader;
+    })
+    .sort((a, b) => {
+      // Prioritize pinned favorites
+      if (a.isFavorite && !b.isFavorite) return -1;
+      if (!a.isFavorite && b.isFavorite) return 1;
+
+      if (sortBy === 'name') {
+        return (a.name || '').localeCompare(b.name || '');
+      }
+      if (sortBy === 'loader') {
+        return (a.loader || '').localeCompare(b.loader || '');
+      }
+      if (sortBy === 'version') {
+        return (b.version || '').localeCompare(a.version || '');
+      }
+      const timeA = a.lastPlayed ? new Date(a.lastPlayed).getTime() : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+      const timeB = b.lastPlayed ? new Date(b.lastPlayed).getTime() : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+      return timeB - timeA;
+    });
+
+  // Loader counts
+  const loaderCounts = {
+    all: instances.length,
+    fabric: instances.filter((i) => (i?.loader || '').toLowerCase() === 'fabric').length,
+    forge: instances.filter((i) => (i?.loader || '').toLowerCase() === 'forge').length,
+    neoforge: instances.filter((i) => (i?.loader || '').toLowerCase() === 'neoforge').length,
+    quilt: instances.filter((i) => (i?.loader || '').toLowerCase() === 'quilt').length,
+    vanilla: instances.filter((i) => (i?.loader || '').toLowerCase() === 'vanilla').length
+  };
+
+  // Playtime Analytics Calculations
+  const totalPlaytimeMinutes = instances.reduce((acc, i) => acc + (i.playTimeMinutes || 0), 0);
+  const totalPlaytimeHours = Math.floor(totalPlaytimeMinutes / 60);
+  const totalPlaytimeRemainingMins = totalPlaytimeMinutes % 60;
+  const totalLaunches = instances.reduce((acc, i) => acc + (i.launchCount || 0), 0);
+  const instancesWithPlaytime = [...instances]
+    .filter((i) => (i.playTimeMinutes || 0) > 0)
+    .sort((a, b) => (b.playTimeMinutes || 0) - (a.playTimeMinutes || 0));
+  const mostPlayedInstance = instancesWithPlaytime[0] || (instances.length > 0 ? instances[0] : null);
+
+  const segmentGradients = [
+    'from-cyan-500 to-blue-500',
+    'from-purple-500 to-pink-500',
+    'from-emerald-500 to-teal-500',
+    'from-amber-500 to-orange-500',
+    'from-rose-500 to-red-500',
+    'from-indigo-500 to-violet-500',
+    'from-sky-400 to-cyan-400',
+    'from-fuchsia-500 to-purple-600'
+  ];
+
+  const segmentDotColors = [
+    'bg-cyan-400',
+    'bg-purple-400',
+    'bg-emerald-400',
+    'bg-amber-400',
+    'bg-rose-400',
+    'bg-indigo-400',
+    'bg-sky-400',
+    'bg-fuchsia-400'
+  ];
+
+  const realPageNavItems: { id: TabType; label: string; icon: React.FC<{ className?: string }> }[] = [
+    { id: 'home', label: 'Play', icon: Gamepad2 },
+    { id: 'instances', label: 'Instances', icon: Boxes },
+    { id: 'marketplace', label: 'Discover', icon: Compass },
+    { id: 'accounts', label: 'Capes & Cosmetics', icon: Sparkles },
+    { id: 'screenshots', label: 'Screenshots', icon: Camera },
+    { id: 'achievements', label: 'Achievements', icon: Trophy },
+    { id: 'social', label: 'Friends & Social', icon: Users },
+    { id: 'settings', label: 'Settings', icon: SettingsIcon }
+  ];
+
+  const modalFilteredInstances = instances.filter((inst) => {
+    if (!launchModalSearch.trim()) return true;
+    const q = launchModalSearch.toLowerCase().trim();
     return (
-      <div className="flex-1 h-full overflow-y-auto p-6 md:p-10 flex flex-col items-center justify-center select-none animate-in fade-in duration-300">
-        <div className="max-w-3xl w-full space-y-8">
-          {/* Main Hero Card for Brand New User */}
-          <div className="relative rounded-3xl overflow-hidden border border-white/[0.12] bg-gradient-to-b from-galaxy-800/90 via-galaxy-900/95 to-galaxy-950 p-8 md:p-12 shadow-2xl text-center space-y-6">
-            {/* Ambient Background Glows */}
-            <div className="absolute -top-24 -left-24 w-80 h-80 rounded-full bg-purple-600/20 blur-3xl pointer-events-none" />
-            <div className="absolute -bottom-24 -right-24 w-80 h-80 rounded-full bg-cyan-500/20 blur-3xl pointer-events-none" />
+      (inst.name || '').toLowerCase().includes(q) ||
+      (inst.version || '').toLowerCase().includes(q) ||
+      (inst.loader || '').toLowerCase().includes(q)
+    );
+  });
 
-            {/* Glowing Orbit Icon */}
-            <div className="relative z-10 mx-auto w-16 h-16 rounded-2xl bg-gradient-to-tr from-purple-600 via-indigo-500 to-cyan-400 p-0.5 shadow-glow-md flex items-center justify-center">
-              <div className="w-full h-full bg-galaxy-950/80 backdrop-blur-sm rounded-2xl flex items-center justify-center">
-                <Sparkles className="w-8 h-8 text-cyan-300 animate-pulse" />
-              </div>
-            </div>
+  // =========================================================================
+  // VIEW 1: DEDICATED INSTANCES LIBRARY (when activeTab === 'instances')
+  // =========================================================================
+  if (activeTab === 'instances') {
+    return (
+      <div
+        onWheel={handleInstancesWheel}
+        className="flex-1 h-full overflow-y-auto p-6 md:p-8 space-y-6 select-none animate-in fade-in duration-200"
+      >
+        {/* Delete Confirmation Modal */}
+        <ConfirmModal
+          isOpen={Boolean(deletingInstance)}
+          title="Delete Instance"
+          subtitle={deletingInstance ? `Permanently delete "${deletingInstance.name}"` : ''}
+          description={
+            <span>
+              Are you sure you want to delete <strong className="text-white font-bold">"{deletingInstance?.name}"</strong>?
+              This will permanently delete all installed mods, shaderpacks, resource packs, configs, and local world saves from your disk.
+            </span>
+          }
+          confirmText="Delete Instance"
+          cancelText="Keep Instance"
+          type="danger"
+          isLoading={isDeletingLoading}
+          onConfirm={handleDeleteConfirm}
+          onClose={() => setDeletingInstance(null)}
+        />
 
-            {/* Title & Tagline */}
-            <div className="relative z-10 space-y-2 max-w-xl mx-auto">
-              <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs font-mono font-semibold">
-                <span>NEW INSTALLATION • NO INSTANCES FOUND</span>
+        {/* Icon Editor Modal */}
+        {editingIconInstance && (
+          <IconEditorModal
+            isOpen={true}
+            initialIcon={editingIconInstance.icon || 'grass_block'}
+            initialBackground={editingIconInstance.iconBackground || 'green'}
+            onSave={handleSaveIcon}
+            onClose={() => setEditingIconInstance(null)}
+          />
+        )}
+
+        {/* Clone Instance Modal */}
+        {cloningInstance && (
+          <CloneInstanceModal
+            isOpen={Boolean(cloningInstance)}
+            onClose={() => setCloningInstance(null)}
+            instance={cloningInstance}
+            onClone={async (instId, options) => {
+              if (onCloneInstance) {
+                await onCloneInstance(instId, options);
+              } else if (window.galaxy) {
+                const cloned = await window.galaxy.cloneInstance(instId, options);
+                if (cloned && onShowToast) {
+                  onShowToast({
+                    type: 'success',
+                    title: 'Instance Cloned',
+                    message: `Cloned "${cloned.name}" successfully.`
+                  });
+                }
+              }
+            }}
+          />
+        )}
+
+        {/* Top Header & Action Row */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center space-x-3">
+              <div className="p-2 rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-300">
+                <Boxes className="w-5 h-5" />
               </div>
-              <h1 className="text-3xl md:text-4xl font-display font-extrabold text-white tracking-tight">
-                Your Universe of Minecraft Awaits
+              <h1 className="text-2xl font-display font-extrabold text-white tracking-tight">
+                Instances Library & Manager
               </h1>
-              <p className="text-xs md:text-sm text-slate-300 leading-relaxed">
-                You do not have any Minecraft instances installed yet. Create a brand new isolated profile with Fabric, Forge, NeoForge, Quilt, or pure Vanilla to begin your adventure.
-              </p>
+              <span className="text-xs font-mono font-semibold text-purple-300 bg-purple-500/15 border border-purple-500/30 px-2.5 py-0.5 rounded-full">
+                {instances.length} Installed
+              </span>
             </div>
-
-            {/* Primary Call-to-Action Button */}
-            <div className="relative z-10 flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-              <button
-                onClick={() => {
-                  sounds.playClick();
-                  onCreateInstance();
-                }}
-                className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-500 to-cyan-400 hover:from-purple-500 hover:to-cyan-300 text-white font-display font-bold text-sm shadow-glow-md hover:shadow-glow-lg flex items-center justify-center space-x-2.5 transition-all transform hover:scale-105 active:scale-95"
-              >
-                <Plus className="w-5 h-5 stroke-[2.5]" />
-                <span className="tracking-wide">CREATE FIRST INSTANCE</span>
-              </button>
-            </div>
-
-            {/* Supported Mod Loaders Pill Row */}
-            <div className="relative z-10 pt-2 flex flex-wrap items-center justify-center gap-2 text-[11px] font-mono text-slate-400">
-              <span className="text-slate-500 font-sans">Supported Loaders:</span>
-              <span className="px-2 py-0.5 rounded-lg bg-blue-500/15 text-blue-300 border border-blue-500/25">Fabric</span>
-              <span className="px-2 py-0.5 rounded-lg bg-amber-500/15 text-amber-300 border border-amber-500/25">Forge</span>
-              <span className="px-2 py-0.5 rounded-lg bg-orange-500/15 text-orange-300 border border-orange-500/25">NeoForge</span>
-              <span className="px-2 py-0.5 rounded-lg bg-purple-500/15 text-purple-300 border border-purple-500/25">Quilt</span>
-              <span className="px-2 py-0.5 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/25">Vanilla</span>
-            </div>
+            <p className="text-xs text-slate-400">
+              Manage, organize, configure, and isolate your Minecraft installations and modded profiles.
+            </p>
           </div>
 
-          {/* 3 Step Quick Start Overview */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div
+          <div className="flex items-center space-x-2.5 flex-shrink-0">
+            <button
               onClick={() => {
                 sounds.playClick();
-                onCreateInstance();
+                onCreateInstance('share_code');
               }}
-              className="p-5 rounded-2xl bg-galaxy-900/60 border border-white/[0.08] hover:border-purple-500/40 cursor-pointer transition-all space-y-2.5 group"
+              className="px-3.5 py-2.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 hover:border-emerald-400/50 text-emerald-300 font-semibold text-xs flex items-center space-x-2 transition-all transform hover:scale-105 active:scale-95 shadow-glow-sm"
+              title="Import 1-Click Share Code (GLX-XXXX)"
             >
-              <div className="w-9 h-9 rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-400 flex items-center justify-center group-hover:scale-110 transition-transform">
-                <Layers className="w-5 h-5" />
+              <Share2 className="w-4 h-4 text-emerald-400" />
+              <span>Import Share Code</span>
+            </button>
+            <button
+              onClick={() => {
+                sounds.playSuccess();
+                onCreateInstance('create');
+              }}
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-cyan-500 hover:from-purple-500 hover:to-cyan-400 text-white font-semibold text-xs shadow-glow-sm hover:shadow-glow-md flex items-center space-x-2 transition-all transform hover:scale-105 active:scale-95"
+            >
+              <Plus className="w-4 h-4 stroke-[2.5]" />
+              <span>Create Instance</span>
+            </button>
+          </div>
+        </div>
+
+        {/* When no instances exist in Instances tab */}
+        {instances.length === 0 ? (
+          <div className="rounded-3xl border border-white/[0.1] bg-gradient-to-b from-galaxy-900/80 via-galaxy-900/90 to-galaxy-950 p-8 md:p-10 shadow-2xl space-y-6">
+            <div className="max-w-xl mx-auto text-center space-y-2">
+              <div className="mx-auto w-14 h-14 rounded-2xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-300 mb-3 shadow-glow-sm">
+                <Boxes className="w-7 h-7" />
               </div>
-              <div>
-                <div className="font-bold text-xs text-slate-100 flex items-center justify-between">
-                  <span>1. Create Instance</span>
-                  <Plus className="w-3.5 h-3.5 text-purple-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+              <h2 className="text-xl font-display font-bold text-white">No Instances Created Yet</h2>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Your instance library is completely isolated and modular. You can create custom installations or import existing modpacks from Modrinth and CurseForge.
+              </p>
+            </div>
+
+            {/* Template Creation Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl mx-auto pt-2">
+              <div
+                onClick={() => {
+                  sounds.playClick();
+                  onCreateInstance('create');
+                }}
+                className="group p-5 rounded-2xl bg-galaxy-950/70 hover:bg-galaxy-850/80 border border-white/[0.08] hover:border-purple-500/50 cursor-pointer transition-all shadow-lg hover:translate-y-[-2px] space-y-3"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="p-2.5 rounded-xl bg-purple-600/20 text-purple-300 border border-purple-500/30 group-hover:scale-110 transition-transform">
+                    <Plus className="w-5 h-5 stroke-[2.5]" />
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-purple-300 group-hover:translate-x-1 transition-all" />
                 </div>
-                <p className="text-[11px] text-slate-400 leading-relaxed mt-1">
-                  Choose your Minecraft release, mod loader, and custom RAM limits.
-                </p>
+                <div>
+                  <h3 className="font-bold text-sm text-slate-100 group-hover:text-purple-300 transition-colors">
+                    Create Custom Instance
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Choose Minecraft version (1.7 to 1.21), mod loader (Fabric, Forge, NeoForge, Quilt, Vanilla), memory, and 3D icons.
+                  </p>
+                </div>
               </div>
-            </div>
 
-            <div className="p-5 rounded-2xl bg-galaxy-900/60 border border-white/[0.08] space-y-2.5">
-              <div className="w-9 h-9 rounded-xl bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 flex items-center justify-center">
-                <Sparkles className="w-5 h-5" />
+              <div
+                onClick={() => {
+                  sounds.playClick();
+                  onCreateInstance('share_code');
+                }}
+                className="group p-5 rounded-2xl bg-galaxy-950/70 hover:bg-galaxy-850/80 border border-white/[0.08] hover:border-emerald-500/50 cursor-pointer transition-all shadow-lg hover:translate-y-[-2px] space-y-3"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="p-2.5 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 group-hover:scale-110 transition-transform">
+                    <Share2 className="w-5 h-5" />
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-emerald-300 group-hover:translate-x-1 transition-all" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-slate-100 group-hover:text-emerald-300 transition-colors">
+                    Import Share Code (GLX)
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Paste any <span className="text-emerald-300 font-mono">GLX-XXXX</span> code to instantly clone and install an exact instance configuration from friends.
+                  </p>
+                </div>
               </div>
-              <div>
-                <div className="font-bold text-xs text-slate-100">2. Modrinth Marketplace</div>
-                <p className="text-[11px] text-slate-400 leading-relaxed mt-1">
-                  1-click install Sodium, Iris shaders, physics mods, and full modpacks.
-                </p>
-              </div>
-            </div>
 
-            <div className="p-5 rounded-2xl bg-galaxy-900/60 border border-white/[0.08] space-y-2.5">
-              <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center">
-                <Zap className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="font-bold text-xs text-slate-100">3. High-FPS Launch</div>
-                <p className="text-[11px] text-slate-400 leading-relaxed mt-1">
-                  Launch with automatic Java version matching and isolated profiles.
-                </p>
+              <div
+                onClick={() => {
+                  sounds.playClick();
+                  onCreateInstance('import');
+                }}
+                className="group p-5 rounded-2xl bg-galaxy-950/70 hover:bg-galaxy-850/80 border border-white/[0.08] hover:border-cyan-500/50 cursor-pointer transition-all shadow-lg hover:translate-y-[-2px] space-y-3"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="p-2.5 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 group-hover:scale-110 transition-transform">
+                    <FolderUp className="w-5 h-5" />
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-cyan-300 group-hover:translate-x-1 transition-all" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-slate-100 group-hover:text-cyan-300 transition-colors">
+                    Import Modpack Archive
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Directly import local <span className="text-cyan-300 font-mono">.mrpack</span> (Modrinth) or <span className="text-purple-300 font-mono">.zip</span> (CurseForge) files with automatic mod extraction.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </div>
-    );
-  }
+        ) : (
+          <>
+            {/* Playtime Statistics & Distribution Section */}
+            <div className="p-5 rounded-2xl bg-gradient-to-b from-galaxy-900/90 to-galaxy-950/90 border border-white/[0.08] backdrop-blur-xl shadow-xl space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center space-x-2.5">
+                  <div className="p-2 rounded-xl bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 shadow-glow-sm">
+                    <Clock className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-display font-bold text-white flex items-center space-x-2">
+                      <span>Playtime Statistics & Distribution</span>
+                      <span className="text-[10px] font-mono font-semibold text-cyan-300 bg-cyan-500/15 border border-cyan-500/30 px-2 py-0.5 rounded-full">
+                        {totalPlaytimeHours > 0 ? `${totalPlaytimeHours}h ${totalPlaytimeRemainingMins}m Total` : `${totalPlaytimeMinutes}m Total`}
+                      </span>
+                    </h2>
+                    <p className="text-[11px] text-slate-400">
+                      Track usage time across instances, game sessions, and launch frequencies.
+                    </p>
+                  </div>
+                </div>
 
-  return (
-    <div className="flex-1 h-full overflow-y-auto p-6 space-y-6 select-none">
-      {/* Hero Banner Section */}
-      {selectedInstance && (
-        <div className="relative rounded-2xl overflow-hidden border border-white/[0.1] bg-gradient-to-b from-galaxy-800/80 via-galaxy-900/90 to-galaxy-950/95 backdrop-blur-xl shadow-2xl p-7">
-          {/* Ambient Glows */}
-          <div className="absolute top-0 right-0 -mt-16 -mr-16 w-80 h-80 rounded-full bg-purple-600/20 blur-3xl pointer-events-none" />
-          <div className="absolute bottom-0 left-1/3 -mb-16 w-80 h-80 rounded-full bg-cyan-500/15 blur-3xl pointer-events-none" />
-
-          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-            {/* Instance Details */}
-            <div className="space-y-3 max-w-xl">
-              <div className="flex items-center space-x-2">
-                <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-mono font-medium uppercase border ${getLoaderColor(selectedInstance.loader)}`}>
-                  {selectedInstance.loader} {selectedInstance.loaderVersion ? `(${selectedInstance.loaderVersion})` : ''}
-                </span>
-                <span className="text-xs font-mono text-slate-400 bg-white/[0.05] px-2 py-0.5 rounded-full border border-white/[0.08]">
-                  MC {selectedInstance.version}
-                </span>
-                {selectedInstance.isOptimized && (
-                  <span className="flex items-center space-x-1 text-[11px] font-medium text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded-full">
-                    <Zap className="w-3 h-3 text-emerald-400" />
-                    <span>Boosted</span>
-                  </span>
-                )}
+                {/* Quick Stat Pill Cards */}
+                <div className="flex items-center space-x-2">
+                  <div className="px-3 py-1.5 rounded-xl bg-galaxy-950/80 border border-white/[0.08] flex items-center space-x-2">
+                    <Activity className="w-3.5 h-3.5 text-purple-400" />
+                    <div className="text-right">
+                      <div className="text-[10px] text-slate-400">Total Launches</div>
+                      <div className="text-xs font-mono font-bold text-slate-200">{totalLaunches} sessions</div>
+                    </div>
+                  </div>
+                  <div className="px-3 py-1.5 rounded-xl bg-galaxy-950/80 border border-white/[0.08] flex items-center space-x-2">
+                    <Star className="w-3.5 h-3.5 text-amber-400" />
+                    <div className="text-right">
+                      <div className="text-[10px] text-slate-400">Top Instance</div>
+                      <div className="text-xs font-mono font-bold text-amber-300 truncate max-w-[110px]">
+                        {mostPlayedInstance ? mostPlayedInstance.name : 'None'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              <h1 className="text-3xl font-display font-extrabold text-white tracking-tight">
-                {selectedInstance.name}
-              </h1>
-
-              <p className="text-xs text-slate-300 leading-relaxed line-clamp-2">
-                Launch into your isolated Minecraft instance. Fast classpath assembly, seamless mod loading, and high-performance JVM optimization.
-              </p>
-
-              {/* Hardware & Spec Badges */}
-              <div className="flex flex-wrap items-center gap-3 pt-1 text-xs text-slate-400 font-mono">
-                <div className="flex items-center space-x-1.5 bg-black/30 px-2.5 py-1 rounded-lg border border-white/[0.06]">
-                  <HardDrive className="w-3.5 h-3.5 text-purple-400" />
-                  <span>{selectedInstance.memoryMax} MB RAM</span>
+              {/* Multi-Segmented Proportional Playtime Bar */}
+              <div className="space-y-2 pt-1">
+                <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
+                  <span className="flex items-center space-x-1.5">
+                    <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                    <span>Instance Playtime Share</span>
+                  </span>
+                  <span>{instancesWithPlaytime.length} Active Profiles</span>
                 </div>
-                <div className="flex items-center space-x-1.5 bg-black/30 px-2.5 py-1 rounded-lg border border-white/[0.06]">
-                  <Cpu className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>{selectedInstance.resolution.width}x{selectedInstance.resolution.height}</span>
-                </div>
-                {selectedInstance.lastPlayed && (
-                  <div className="flex items-center space-x-1.5 bg-black/30 px-2.5 py-1 rounded-lg border border-white/[0.06]">
-                    <span>Played {new Date(selectedInstance.lastPlayed).toLocaleDateString()}</span>
+
+                {totalPlaytimeMinutes > 0 ? (
+                  <div className="h-4 w-full rounded-full overflow-hidden flex bg-galaxy-950/90 border border-white/[0.1] p-0.5 shadow-inner gap-0.5">
+                    {instancesWithPlaytime.map((inst, idx) => {
+                      const instMins = inst.playTimeMinutes || 0;
+                      const pct = Math.max(Math.round((instMins / totalPlaytimeMinutes) * 100), 1);
+                      const gradient = segmentGradients[idx % segmentGradients.length];
+                      const hours = Math.floor(instMins / 60);
+                      const mins = instMins % 60;
+                      return (
+                        <div
+                          key={inst.id}
+                          style={{ width: `${pct}%` }}
+                          className={`h-full bg-gradient-to-r ${gradient} rounded-full transition-all duration-500 hover:opacity-90 cursor-pointer group/segment relative`}
+                          title={`${inst.name}: ${hours}h ${mins}m (${pct}%)`}
+                        >
+                          {/* Floating segment tooltip */}
+                          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 px-2.5 py-1 rounded-lg bg-galaxy-950/95 border border-white/[0.15] text-[10px] font-mono text-slate-200 whitespace-nowrap opacity-0 group-hover/segment:opacity-100 pointer-events-none transition-all shadow-xl z-30">
+                            {inst.name}: {hours}h {mins}m ({pct}%)
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="h-4 w-full rounded-full bg-galaxy-950/80 border border-white/[0.08] flex items-center justify-center text-[10px] font-mono text-slate-500">
+                    No playtime recorded yet • Launch an instance to start tracking
+                  </div>
+                )}
+
+                {/* Instance Legend / Breakdown Chips */}
+                {instancesWithPlaytime.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-2 pt-1.5">
+                    {instancesWithPlaytime.slice(0, 6).map((inst, idx) => {
+                      const instMins = inst.playTimeMinutes || 0;
+                      const pct = Math.max(Math.round((instMins / totalPlaytimeMinutes) * 100), 1);
+                      const dotColor = segmentDotColors[idx % segmentDotColors.length];
+                      const hours = Math.floor(instMins / 60);
+                      const mins = instMins % 60;
+                      return (
+                        <div
+                          key={inst.id}
+                          onClick={() => onSelectInstance(inst)}
+                          className="px-2.5 py-1 rounded-lg bg-galaxy-950/70 hover:bg-galaxy-900 border border-white/[0.06] hover:border-cyan-500/40 cursor-pointer flex items-center space-x-1.5 text-[11px] transition-all"
+                        >
+                          <span className={`w-2 h-2 rounded-full ${dotColor}`} />
+                          <span className="font-medium text-slate-200 truncate max-w-[120px]">{inst.name}</span>
+                          <span className="text-[10px] font-mono text-slate-400">
+                            {hours > 0 ? `${hours}h ${mins}m` : `${mins}m`} ({pct}%)
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
             </div>
 
+            {/* Filter, Search & View Controls Bar */}
+            <div className="p-4 rounded-2xl bg-galaxy-900/70 border border-white/[0.08] backdrop-blur-md space-y-3.5 shadow-lg">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                {/* Search Input */}
+                <div className="relative flex-1 max-w-md">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Search instances by name, version, loader..."
+                    value={searchFilter}
+                    onChange={(e) => setSearchFilter(e.target.value)}
+                    className="w-full pl-9 pr-8 py-2 rounded-xl bg-galaxy-950/80 border border-white/[0.1] text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-purple-500/60"
+                  />
+                  {searchFilter && (
+                    <button
+                      onClick={() => setSearchFilter('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Sort & View Controls */}
+                <div className="flex items-center space-x-3">
+                  {/* Sort dropdown */}
+                  <div className="flex items-center space-x-1.5 text-xs text-slate-400">
+                    <ArrowUpDown className="w-3.5 h-3.5" />
+                    <select
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value as any)}
+                      className="bg-galaxy-950/80 border border-white/[0.1] rounded-xl px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-purple-500"
+                    >
+                      <option value="recent">Recently Played</option>
+                      <option value="name">Name (A-Z)</option>
+                      <option value="loader">Loader Type</option>
+                      <option value="version">Minecraft Version</option>
+                    </select>
+                  </div>
+
+                  {/* View Mode Toggle */}
+                  <div className="flex items-center p-0.5 rounded-xl bg-galaxy-950/80 border border-white/[0.1]">
+                    <button
+                      onClick={() => setViewMode('grid')}
+                      className={`p-1.5 rounded-lg transition-colors ${
+                        viewMode === 'grid' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'
+                      }`}
+                      title="Grid View"
+                    >
+                      <LayoutGrid className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => setViewMode('list')}
+                      className={`p-1.5 rounded-lg transition-colors ${
+                        viewMode === 'list' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'
+                      }`}
+                      title="List View"
+                    >
+                      <List className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Loader Filter Chips */}
+              <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-white/[0.05]">
+                {[
+                  { id: 'all', label: 'All Instances', count: loaderCounts.all },
+                  { id: 'fabric', label: 'Fabric', count: loaderCounts.fabric },
+                  { id: 'forge', label: 'Forge', count: loaderCounts.forge },
+                  { id: 'neoforge', label: 'NeoForge', count: loaderCounts.neoforge },
+                  { id: 'quilt', label: 'Quilt', count: loaderCounts.quilt },
+                  { id: 'vanilla', label: 'Vanilla', count: loaderCounts.vanilla }
+                ].map((chip) => {
+                  const isActive = selectedLoaderFilter === chip.id;
+                  return (
+                    <button
+                      key={chip.id}
+                      onClick={() => {
+                        sounds.playSwitch();
+                        setSelectedLoaderFilter(chip.id);
+                      }}
+                      className={`px-3 py-1 rounded-xl text-xs font-medium flex items-center space-x-1.5 transition-all ${
+                        isActive
+                          ? 'bg-purple-600 text-white shadow-glow-sm'
+                          : 'bg-white/[0.04] text-slate-400 hover:text-slate-200 hover:bg-white/[0.08] border border-white/[0.06]'
+                      }`}
+                    >
+                      <span>{chip.label}</span>
+                      <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-md ${
+                        isActive ? 'bg-black/30 text-white' : 'bg-white/[0.06] text-slate-400'
+                      }`}>
+                        {chip.count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Content Body: Grid or List */}
+            {filteredAndSortedInstances.length === 0 ? (
+              <div className="rounded-3xl border border-dashed border-white/10 p-12 text-center space-y-4 bg-galaxy-900/30">
+                <Boxes className="w-12 h-12 text-slate-600 mx-auto" />
+                <div className="space-y-1">
+                  <h3 className="text-base font-semibold text-slate-200">No Instances Found</h3>
+                  <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                    No instances matched your current search query or loader filter.
+                  </p>
+                </div>
+                <div className="flex items-center justify-center gap-3 pt-2">
+                  <button
+                    onClick={() => {
+                      setSearchFilter('');
+                      setSelectedLoaderFilter('all');
+                    }}
+                    className="px-4 py-2 rounded-xl bg-white/[0.08] hover:bg-white/[0.15] text-xs font-semibold text-slate-200 transition-colors"
+                  >
+                    Clear Filters
+                  </button>
+                  <button
+                    onClick={() => {
+                      sounds.playSuccess();
+                      onCreateInstance('create');
+                    }}
+                    className="px-4 py-2 rounded-xl bg-purple-600 text-xs font-semibold text-white shadow-glow-sm"
+                  >
+                    Create New Instance
+                  </button>
+                </div>
+              </div>
+            ) : viewMode === 'grid' ? (
+              /* Grid View Mode */
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,250px))] gap-4">
+                {filteredAndSortedInstances.map((inst) => {
+                  const isSelected = selectedInstance?.id === inst.id;
+                  const isInstRunning = inst.isRunning;
+                  return (
+                    <div
+                      key={inst.id}
+                      onClick={() => {
+                        sounds.playClick();
+                        onSelectInstance(inst);
+                      }}
+                      className={`group relative p-3.5 rounded-2xl cursor-pointer transition-all border flex flex-col justify-between space-y-3 ${
+                        isSelected
+                          ? 'bg-galaxy-800/90 border-purple-500/70 shadow-glow-md ring-1 ring-purple-500/50'
+                          : 'bg-galaxy-900/60 hover:bg-galaxy-850/80 border-white/[0.08] hover:border-white/[0.2] hover:translate-y-[-2px]'
+                      }`}
+                    >
+                      {/* Top Tile: 3D Isometric Icon & Overlay */}
+                      <div className="relative w-full h-28 rounded-xl bg-black/30 border border-white/[0.05] overflow-hidden flex items-center justify-center">
+                        <InstanceIconRenderer
+                          icon={inst.icon || 'grass_block'}
+                          background={inst.iconBackground || 'obsidian'}
+                          size="lg"
+                          className="w-16 h-16 rounded-2xl shadow-lg transform group-hover:scale-105 transition-transform duration-300"
+                        />
+
+                        {/* Favorite badge */}
+                        {inst.isFavorite && (
+                          <div className="absolute top-2 left-2 p-1 rounded-lg bg-amber-500/30 text-amber-300 border border-amber-500/40 shadow-glow-sm z-10" title="Favorite Instance">
+                            <Star className="w-3.5 h-3.5 fill-current" />
+                          </div>
+                        )}
+
+                        {/* Running status badge */}
+                        {isInstRunning && (
+                          <div className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-emerald-500/90 text-slate-950 font-bold text-[10px] flex items-center space-x-1 shadow-lg animate-pulse z-10">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-950" />
+                            <span>RUNNING</span>
+                          </div>
+                        )}
+
+                        {/* Redesigned Modern Spacious Glassmorphic Hover Overlay */}
+                        <div className="absolute inset-0 bg-galaxy-950/85 backdrop-blur-md opacity-0 group-hover:opacity-100 flex flex-col justify-between p-2.5 transition-all duration-200 z-20 rounded-xl">
+                          {/* Top Action Bar */}
+                          <div className="flex items-center justify-between w-full">
+                            {/* Favorite Toggle */}
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                sounds.playClick();
+                                await window.galaxy?.toggleInstanceFavorite(inst.id);
+                                const updated = { ...inst, isFavorite: !inst.isFavorite };
+                                onUpdateInstance?.(updated);
+                                onShowToast?.({
+                                  id: Math.random().toString(),
+                                  type: 'info',
+                                  title: updated.isFavorite ? 'Starred as Favorite' : 'Unstarred',
+                                  message: `${inst.name} is now ${updated.isFavorite ? 'pinned to the top' : 'unstarred'}.`
+                                });
+                              }}
+                              className={`p-1.5 rounded-lg border transition-all ${
+                                inst.isFavorite
+                                  ? 'bg-amber-500/30 text-amber-300 border-amber-500/50 shadow-glow-sm'
+                                  : 'bg-white/10 text-slate-400 hover:text-amber-300 hover:bg-white/20 border-white/10'
+                              }`}
+                              title={inst.isFavorite ? 'Unstar Instance' : 'Star as Favorite'}
+                            >
+                              <Star className="w-3.5 h-3.5 fill-current" />
+                            </button>
+
+                            {/* Top-Right Quick Utilities */}
+                            <div className="flex items-center space-x-1">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  sounds.playClick();
+                                  onOpenInstanceDetails(inst);
+                                }}
+                                className="p-1.5 rounded-lg bg-white/10 hover:bg-purple-600/40 text-slate-300 hover:text-purple-300 border border-white/10 transition-all hover:scale-105 active:scale-95"
+                                title="Configure Instance"
+                              >
+                                <SettingsIcon className="w-3.5 h-3.5" />
+                              </button>
+
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  sounds.playClick();
+                                  setCloningInstance(inst);
+                                }}
+                                className="p-1.5 rounded-lg bg-white/10 hover:bg-purple-600/40 text-slate-300 hover:text-purple-300 border border-white/10 transition-all hover:scale-105 active:scale-95"
+                                title="Clone Instance"
+                              >
+                                <Copy className="w-3.5 h-3.5 text-purple-300" />
+                              </button>
+
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  sounds.playClick();
+                                  setEditingIconInstance(inst);
+                                }}
+                                className="p-1.5 rounded-lg bg-white/10 hover:bg-cyan-600/40 text-slate-300 hover:text-cyan-300 border border-white/10 transition-all hover:scale-105 active:scale-95"
+                                title="Change Icon & Background"
+                              >
+                                <Palette className="w-3.5 h-3.5 text-cyan-300" />
+                              </button>
+
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  sounds.playClick();
+                                  setDeletingInstance(inst);
+                                }}
+                                className="p-1.5 rounded-lg bg-white/10 hover:bg-rose-600 text-slate-400 hover:text-white border border-white/10 transition-all hover:scale-105 active:scale-95"
+                                title="Delete Instance"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Center Prominent Play / Stop Button */}
+                          <div className="flex items-center justify-center my-auto">
+                            {isInstRunning ? (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  sounds.playError();
+                                  onKill(inst);
+                                }}
+                                className="w-10 h-10 rounded-full bg-rose-600 hover:bg-rose-500 text-white font-bold flex items-center justify-center shadow-lg hover:scale-110 active:scale-95 transition-all ring-2 ring-rose-400/40"
+                                title="Stop Game"
+                              >
+                                <Square className="w-4 h-4 fill-current" />
+                              </button>
+                            ) : (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  sounds.playLaunch();
+                                  onLaunch(inst);
+                                }}
+                                className="w-10 h-10 rounded-full bg-gradient-to-tr from-emerald-500 via-teal-400 to-cyan-400 text-slate-950 font-bold flex items-center justify-center shadow-[0_0_18px_rgba(16,185,129,0.6)] hover:scale-110 active:scale-95 transition-all ring-2 ring-emerald-400/40 pl-0.5"
+                                title="Launch Game"
+                              >
+                                <Play className="w-4 h-4 fill-current" />
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Bottom Status Text */}
+                          <div className="text-center">
+                            <span className="text-[9px] font-mono font-bold tracking-wider uppercase text-slate-300/80">
+                              {isInstRunning ? 'STOP PROCESS' : 'START INSTANCE'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Instance Metadata */}
+                      <div className="space-y-1.5 pt-1">
+                        <div className="font-display font-bold text-sm text-slate-100 truncate group-hover:text-purple-300 transition-colors">
+                          {inst.name || 'Untitled Instance'}
+                        </div>
+
+                        <div className="flex items-center space-x-1.5">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-medium uppercase border ${getLoaderColor(inst.loader)}`}>
+                            {inst.loader || 'vanilla'}
+                          </span>
+                          <span className="text-[10px] font-mono text-slate-400 bg-white/[0.05] px-1.5 py-0.5 rounded border border-white/[0.06]">
+                            MC {inst.version || '1.21.1'}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono pt-1">
+                          <span>{inst.memoryMax ?? 4096} MB RAM</span>
+                          <span>{inst.lastPlayed ? new Date(inst.lastPlayed).toLocaleDateString() : 'Never'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              /* List View Mode */
+              <div className="space-y-2">
+                {filteredAndSortedInstances.map((inst) => {
+                  const isSelected = selectedInstance?.id === inst.id;
+                  const isInstRunning = inst.isRunning;
+                  return (
+                    <div
+                      key={inst.id}
+                      onClick={() => {
+                        sounds.playClick();
+                        onSelectInstance(inst);
+                      }}
+                      className={`p-3.5 rounded-2xl cursor-pointer transition-all border flex items-center justify-between space-x-4 ${
+                        isSelected
+                          ? 'bg-galaxy-800/90 border-purple-500/70 shadow-glow-sm'
+                          : 'bg-galaxy-900/60 hover:bg-galaxy-850/80 border-white/[0.08] hover:border-white/[0.18]'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-4 min-w-0">
+                        <div
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            sounds.playClick();
+                            setEditingIconInstance(inst);
+                          }}
+                          className="group/icon relative cursor-pointer flex-shrink-0"
+                          title="Edit Icon & Color"
+                        >
+                          <InstanceIconRenderer
+                            icon={inst.icon || 'grass_block'}
+                            background={inst.iconBackground || 'obsidian'}
+                            size="md"
+                            className="w-12 h-12 rounded-xl group-hover/icon:scale-105 transition-transform"
+                          />
+                          <div className="absolute inset-0 bg-black/60 rounded-xl opacity-0 group-hover/icon:opacity-100 flex items-center justify-center text-white transition-opacity">
+                            <Palette className="w-3.5 h-3.5 text-cyan-300" />
+                          </div>
+                        </div>
+
+                        <div className="space-y-1 min-w-0">
+                          <div className="flex items-center space-x-2">
+                            <div className="font-display font-bold text-sm text-slate-100 truncate">
+                              {inst.name || 'Untitled Instance'}
+                            </div>
+                            {isInstRunning && (
+                              <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-mono animate-pulse">
+                                RUNNING
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center space-x-2 text-[11px] font-mono text-slate-400">
+                            <span className={`px-1.5 py-0.2 rounded border ${getLoaderColor(inst.loader)} uppercase`}>
+                              {inst.loader || 'vanilla'}
+                            </span>
+                            <span>•</span>
+                            <span>MC {inst.version || '1.21.1'}</span>
+                            <span>•</span>
+                            <span>{inst.memoryMax ?? 4096} MB RAM</span>
+                            <span>•</span>
+                            <span>{inst.lastPlayed ? `Played ${new Date(inst.lastPlayed).toLocaleDateString()}` : 'Never played'}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center space-x-2 flex-shrink-0">
+                        {/* Star Favorite Button */}
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            sounds.playClick();
+                            await window.galaxy?.toggleInstanceFavorite(inst.id);
+                            const updated = { ...inst, isFavorite: !inst.isFavorite };
+                            onUpdateInstance?.(updated);
+                            onShowToast?.({
+                              id: Math.random().toString(),
+                              type: 'info',
+                              title: updated.isFavorite ? 'Starred as Favorite' : 'Unstarred',
+                              message: `${inst.name} is now ${updated.isFavorite ? 'pinned to top' : 'unstarred'}.`
+                            });
+                          }}
+                          className={`p-2 rounded-xl border transition-all ${
+                            inst.isFavorite
+                              ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-glow-sm'
+                              : 'bg-white/[0.04] text-slate-500 hover:text-amber-300 border-white/[0.06]'
+                          }`}
+                          title={inst.isFavorite ? 'Unstar Instance' : 'Star as Favorite'}
+                        >
+                          <Star className="w-4 h-4 fill-current" />
+                        </button>
+
+                        {isInstRunning ? (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              sounds.playError();
+                              onKill(inst);
+                            }}
+                            className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-glow-sm flex items-center space-x-1.5"
+                          >
+                            <Square className="w-3.5 h-3.5 fill-current" />
+                            <span>Stop</span>
+                          </button>
+                        ) : (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              sounds.playLaunch();
+                              onLaunch(inst);
+                            }}
+                            className="px-4 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 font-bold text-xs flex items-center space-x-1.5 transition-all transform hover:scale-105 active:scale-95"
+                          >
+                            <Play className="w-3.5 h-3.5 fill-current" />
+                            <span>Play</span>
+                          </button>
+                        )}
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            sounds.playClick();
+                            onOpenInstanceDetails(inst);
+                          }}
+                          className="p-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] text-slate-300 transition-colors"
+                          title="Settings"
+                        >
+                          <SettingsIcon className="w-4 h-4 text-purple-400" />
+                        </button>
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            sounds.playClick();
+                            setCloningInstance(inst);
+                          }}
+                          className="p-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] text-slate-300 transition-colors"
+                          title="Clone Instance"
+                        >
+                          <Copy className="w-4 h-4 text-purple-400" />
+                        </button>
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            sounds.playClick();
+                            onOpenFolder(inst);
+                          }}
+                          className="p-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] text-slate-300 transition-colors"
+                          title="Open Folder"
+                        >
+                          <FolderOpen className="w-4 h-4 text-cyan-400" />
+                        </button>
+
+                        {/* Direct Delete in List View */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            sounds.playClick();
+                            setDeletingInstance(inst);
+                          }}
+                          className="p-2 rounded-xl bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 transition-all"
+                          title="Delete Instance"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    );
+  }
+
+  // =========================================================================
+  // VIEW 2: PLAY TAB / COMMAND HUB HERO (activeTab === 'home')
+  // =========================================================================
+  return (
+    <div
+      onWheel={handlePlayPageWheel}
+      className="relative w-full h-full overflow-hidden select-none flex flex-col justify-between p-6 md:p-8 animate-in fade-in duration-200"
+    >
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={Boolean(deletingInstance)}
+        title="Delete Instance"
+        subtitle={deletingInstance ? `Permanently delete "${deletingInstance.name}"` : ''}
+        description={
+          <span>
+            Are you sure you want to delete <strong className="text-white font-bold">"{deletingInstance?.name}"</strong>?
+            This will permanently delete all installed mods, shaderpacks, configs, and local world saves from your disk.
+          </span>
+        }
+        confirmText="Delete Instance"
+        cancelText="Keep Instance"
+        type="danger"
+        isLoading={isDeletingLoading}
+        onConfirm={handleDeleteConfirm}
+        onClose={() => setDeletingInstance(null)}
+      />
+
+      {/* Icon Editor Modal */}
+      {editingIconInstance && (
+        <IconEditorModal
+          isOpen={true}
+          initialIcon={editingIconInstance.icon || 'grass_block'}
+          initialBackground={editingIconInstance.iconBackground || 'green'}
+          onSave={handleSaveIcon}
+          onClose={() => setEditingIconInstance(null)}
+        />
+      )}
+
+      {/* Share Instance Modal (GLX-XXXX) */}
+      {sharingInstance && (
+        <ShareInstanceModal
+          instance={sharingInstance}
+          onClose={() => setSharingInstance(null)}
+          onShowToast={onShowToast || (() => {})}
+        />
+      )}
+
+      {/* Clone Instance Modal */}
+      {cloningInstance && (
+        <CloneInstanceModal
+          isOpen={Boolean(cloningInstance)}
+          onClose={() => setCloningInstance(null)}
+          instance={cloningInstance}
+          onClone={async (instId, options) => {
+            if (onCloneInstance) {
+              await onCloneInstance(instId, options);
+            } else if (window.galaxy) {
+              const cloned = await window.galaxy.cloneInstance(instId, options);
+              if (cloned && onShowToast) {
+                onShowToast({
+                  type: 'success',
+                  title: 'Instance Cloned',
+                  message: `Cloned "${cloned.name}" successfully.`
+                });
+              }
+            }
+          }}
+        />
+      )}
+
+      {/* Quick Launch Instance Picker Modal (Prompt on Scroll Up) */}
+      {showLaunchModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div
+            className="fixed inset-0"
+            onClick={() => {
+              sounds.playClick();
+              setShowLaunchModal(false);
+            }}
+          />
+
+          <div className="relative w-full max-w-xl max-h-[85vh] bg-galaxy-900 border border-white/[0.12] rounded-2xl shadow-2xl flex flex-col overflow-hidden z-10 animate-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="p-5 border-b border-white/[0.08] flex items-center justify-between bg-galaxy-950/60">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shadow-glow-sm">
+                  <Rocket className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-display font-bold text-white">
+                    Quick Launch
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Select which instance profile you want to launch
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  sounds.playClick();
+                  setShowLaunchModal(false);
+                }}
+                className="p-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-slate-400 hover:text-white border border-white/[0.08] transition-colors"
+                title="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Search Filter if > 3 instances */}
+            {instances.length > 3 && (
+              <div className="p-3.5 bg-galaxy-900/90 border-b border-white/[0.06]">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <input
+                    type="text"
+                    value={launchModalSearch}
+                    onChange={(e) => setLaunchModalSearch(e.target.value)}
+                    placeholder="Search instance by name, version, loader..."
+                    className="w-full pl-9 pr-4 py-2 bg-galaxy-950/80 border border-white/[0.08] rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500/50 transition-colors"
+                    autoFocus
+                  />
+                  {launchModalSearch && (
+                    <button
+                      onClick={() => setLaunchModalSearch('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Instance List */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-2.5 max-h-[55vh] custom-scrollbar">
+              {modalFilteredInstances.length === 0 ? (
+                <div className="py-12 text-center text-xs text-slate-400">
+                  No instances match "{launchModalSearch}".
+                </div>
+              ) : (
+                modalFilteredInstances.map((inst) => {
+                  const isInstSelected = selectedInstance?.id === inst.id;
+                  const isInstRunning = inst.isRunning;
+                  const isInstLaunching = launchProgress && launchProgress.instanceId === inst.id;
+
+                  return (
+                    <div
+                      key={inst.id}
+                      onClick={() => {
+                        onSelectInstance(inst);
+                      }}
+                      className={`p-3.5 rounded-xl border transition-all flex items-center justify-between gap-3 cursor-pointer ${
+                        isInstSelected
+                          ? 'bg-emerald-950/25 border-emerald-500/40 shadow-sm'
+                          : 'bg-galaxy-950/60 hover:bg-galaxy-800/80 border-white/[0.06] hover:border-white/[0.15]'
+                      }`}
+                    >
+                      {/* Left: Icon & Meta */}
+                      <div className="flex items-center space-x-3 min-w-0">
+                        <InstanceIconRenderer
+                          icon={inst.icon || 'grass_block'}
+                          background={inst.iconBackground || 'obsidian'}
+                          size="sm"
+                          className="w-11 h-11 rounded-xl shrink-0 shadow-md"
+                        />
+
+                        <div className="min-w-0 space-y-1">
+                          <div className="flex items-center space-x-2">
+                            <span className="text-sm font-bold text-white font-display truncate">
+                              {inst.name}
+                            </span>
+                            {inst.isFavorite && (
+                              <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0" />
+                            )}
+                          </div>
+
+                          <div className="flex items-center space-x-2 text-[11px] font-mono text-slate-400">
+                            <span className="capitalize px-1.5 py-0.2 rounded bg-white/[0.05] border border-white/[0.08] text-slate-300">
+                              {inst.loader || 'vanilla'}
+                            </span>
+                            <span>MC {inst.version}</span>
+                            <span className="text-slate-500">•</span>
+                            <span>{inst.memoryMax || 4096} MB</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right: Launch / Stop Button */}
+                      <div className="shrink-0">
+                        {isInstRunning ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              sounds.playError();
+                              onKill(inst);
+                              setShowLaunchModal(false);
+                            }}
+                            className="px-4 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600 border border-rose-500/40 text-rose-300 hover:text-white text-xs font-bold transition-all"
+                          >
+                            Stop Game
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (isInstLaunching) return;
+                              sounds.playLaunch();
+                              onSelectInstance(inst);
+                              onLaunch(inst);
+                              setShowLaunchModal(false);
+                              onShowToast?.({
+                                type: 'success',
+                                title: `Launching ${inst.name}...`,
+                                message: `Minecraft ${inst.version} (${inst.loader.toUpperCase()})`
+                              });
+                            }}
+                            disabled={Boolean(isInstLaunching)}
+                            className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 text-slate-950 font-bold text-xs shadow-glow-sm hover:shadow-glow-md flex items-center space-x-1.5 transition-all transform hover:scale-105 active:scale-95 disabled:opacity-50"
+                          >
+                            {isInstLaunching ? (
+                              <>
+                                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                <span>Launching...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Play className="w-3.5 h-3.5 fill-current" />
+                                <span>Play Now</span>
+                              </>
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-3.5 bg-galaxy-950/80 border-t border-white/[0.08] flex items-center justify-between text-xs text-slate-400">
+              <span className="font-mono text-[11px] text-slate-500">
+                {instances.length} instance{instances.length === 1 ? '' : 's'} configured
+              </span>
+              <button
+                onClick={() => {
+                  sounds.playClick();
+                  setShowLaunchModal(false);
+                }}
+                className="px-4 py-1.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-white text-xs font-medium border border-white/[0.1] transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Bottom Navigation Rail (Maps to Real Tabs) */}
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-40 flex items-center space-x-2 bg-galaxy-950/85 px-4 py-2 rounded-full border border-white/[0.12] backdrop-blur-2xl shadow-[0_4px_30px_rgba(0,0,0,0.8)]">
+        {realPageNavItems.map((item) => {
+          const isActive = item.id === 'home';
+          const IconComponent = item.icon;
+          return (
+            <button
+              key={item.id}
+              onClick={() => {
+                sounds.playSwitch();
+                onSelectTab?.(item.id);
+              }}
+              className="group relative p-1.5 rounded-full transition-all focus:outline-none"
+              title={item.label}
+            >
+              {/* Glowing active indicator pill / dot */}
+              <span
+                className={`block rounded-full transition-all duration-300 ${
+                  isActive
+                    ? 'w-7 h-2 bg-gradient-to-r from-cyan-400 to-purple-400 shadow-[0_0_14px_rgba(6,182,212,0.9)] ring-1 ring-cyan-400/50'
+                    : 'w-2 h-2 bg-slate-500 hover:bg-slate-300 opacity-60 hover:opacity-100'
+                }`}
+              />
+
+              {/* Floating tooltip on hover */}
+              <div className="absolute bottom-9 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-xl bg-galaxy-900/95 border border-white/[0.15] text-[11px] font-medium text-slate-200 whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-all shadow-2xl backdrop-blur-md flex items-center space-x-1.5 transform translate-y-1 group-hover:translate-y-0 z-50">
+                <IconComponent className="w-3.5 h-3.5 text-cyan-300" />
+                <span>{item.label}</span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Top Subtle Scroll Up Cue */}
+      <div
+        onClick={handleQuickLaunch}
+        className="cursor-pointer group flex items-center justify-center space-x-1.5 pt-1 text-slate-500 hover:text-emerald-400 transition-colors self-center"
+        title="Scroll up or click to Quick Launch Minecraft"
+      >
+        <ChevronUp className="w-3.5 h-3.5 group-hover:-translate-y-0.5 transition-transform text-emerald-400/70" />
+        <span className="text-[10px] font-mono uppercase tracking-widest opacity-60 group-hover:opacity-100">
+          Scroll up to quick launch
+        </span>
+      </div>
+
+      {/* =========================================================================
+          PLAY COMMAND HUB (HERO STAGE)
+         ========================================================================= */}
+      {instances.length === 0 || !selectedInstance ? (
+        /* When no instances exist: Show Cosmic Quick Launch Station */
+        <div className="relative space-y-6 max-w-4xl w-full mx-auto my-auto animate-in fade-in zoom-in-95 duration-200">
+          {/* Ambient Celestial Galaxy Orbit Background */}
+          <div className="absolute inset-0 pointer-events-none -z-10 flex items-center justify-center overflow-hidden opacity-75">
+            <div className="absolute w-[520px] h-[520px] rounded-full border border-purple-500/20 animate-spin-slow" />
+            <div className="absolute w-[380px] h-[380px] rounded-full border border-dashed border-cyan-500/25 animate-reverse-spin" />
+            <div className="absolute w-80 h-80 rounded-full bg-purple-600/15 blur-3xl animate-pulse" />
+          </div>
+
+          {/* Main Hero Card for Brand New User */}
+          <div className="relative rounded-3xl overflow-hidden border border-white/[0.14] bg-gradient-to-b from-galaxy-850/95 via-galaxy-900/95 to-galaxy-950/98 p-6 md:p-8 shadow-2xl text-center space-y-5 backdrop-blur-xl">
+            <div className="relative z-10 mx-auto w-14 h-14 rounded-2xl bg-gradient-to-tr from-purple-600 via-indigo-500 to-cyan-400 p-0.5 shadow-glow-lg flex items-center justify-center">
+              <div className="w-full h-full bg-galaxy-950/90 backdrop-blur-md rounded-2xl flex items-center justify-center">
+                <Gamepad2 className="w-7 h-7 text-cyan-300 animate-pulse" />
+              </div>
+            </div>
+
+            <div className="relative z-10 space-y-1.5 max-w-xl mx-auto">
+              <div className="inline-flex items-center space-x-2 px-3.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-[11px] font-mono font-semibold tracking-wider">
+                <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                <span>GALAXY COMMAND CENTER</span>
+              </div>
+              <h1 className="text-2xl md:text-3xl font-display font-extrabold text-white tracking-tight">
+                Ready to Launch Your Universe
+              </h1>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Choose a ready-to-play profile or create your own custom setup with 100,000+ mods, shaders, and optimizations.
+              </p>
+            </div>
+
+            {/* Quick 1-Click Launch Options (4-Grid) */}
+            <div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1 text-left">
+              <div
+                onClick={() => {
+                  sounds.playClick();
+                  onCreateInstance();
+                }}
+                className="p-3.5 rounded-2xl bg-galaxy-950/85 hover:bg-galaxy-850 border border-white/[0.08] hover:border-emerald-500/50 cursor-pointer transition-all shadow-lg group hover:scale-[1.02] hover:shadow-glow-sm"
+              >
+                <div className="flex items-center space-x-2.5 mb-1.5">
+                  <InstanceIconRenderer icon="grass_block" background="green" size="sm" shadow={false} />
+                  <span className="font-bold text-xs text-slate-100 group-hover:text-emerald-300 transition-colors">Vanilla 1.21.4</span>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-tight">Official pure Minecraft with zero modifications.</p>
+              </div>
+
+              <div
+                onClick={() => {
+                  sounds.playClick();
+                  onCreateInstance();
+                }}
+                className="p-3.5 rounded-2xl bg-galaxy-950/85 hover:bg-galaxy-850 border border-white/[0.08] hover:border-blue-500/50 cursor-pointer transition-all shadow-lg group hover:scale-[1.02] hover:shadow-glow-sm"
+              >
+                <div className="flex items-center space-x-2.5 mb-1.5">
+                  <InstanceIconRenderer icon="backpack" background="blue" size="sm" shadow={false} />
+                  <span className="font-bold text-xs text-slate-100 group-hover:text-blue-300 transition-colors">Fabric Optimized</span>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-tight">Sodium + Lithium tuned for 300+ FPS boost.</p>
+              </div>
+
+              <div
+                onClick={() => {
+                  sounds.playClick();
+                  onCreateInstance();
+                }}
+                className="p-3.5 rounded-2xl bg-galaxy-950/85 hover:bg-galaxy-850 border border-white/[0.08] hover:border-orange-500/50 cursor-pointer transition-all shadow-lg group hover:scale-[1.02] hover:shadow-glow-sm"
+              >
+                <div className="flex items-center space-x-2.5 mb-1.5">
+                  <InstanceIconRenderer icon="anvil" background="orange" size="sm" shadow={false} />
+                  <span className="font-bold text-xs text-slate-100 group-hover:text-orange-300 transition-colors">Forge Modded</span>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-tight">Built for heavy tech modpacks and shaders.</p>
+              </div>
+
+              <div
+                onClick={() => {
+                  sounds.playClick();
+                  onCreateInstance();
+                }}
+                className="p-3.5 rounded-2xl bg-galaxy-950/85 hover:bg-galaxy-850 border border-white/[0.08] hover:border-rose-500/50 cursor-pointer transition-all shadow-lg group hover:scale-[1.02] hover:shadow-glow-sm"
+              >
+                <div className="flex items-center space-x-2.5 mb-1.5">
+                  <InstanceIconRenderer icon="redstone" background="ruby" size="sm" shadow={false} />
+                  <span className="font-bold text-xs text-slate-100 group-hover:text-rose-300 transition-colors">NeoForge 1.21.1</span>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-tight">Next-generation modern Minecraft modding.</p>
+              </div>
+            </div>
+
+            {/* Call to Action Button */}
+            <div className="relative z-10 pt-1 flex items-center justify-center">
+              <button
+                onClick={() => {
+                  sounds.playClick();
+                  onCreateInstance();
+                }}
+                className="px-8 py-3 rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-600 to-cyan-400 hover:from-purple-500 hover:to-cyan-300 text-white font-display font-bold text-xs shadow-glow-md hover:shadow-glow-lg flex items-center space-x-2.5 transition-all transform hover:scale-105 active:scale-95"
+              >
+                <Plus className="w-4 h-4 stroke-[2.5]" />
+                <span className="tracking-wide">CREATE FIRST INSTANCE</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* Selected Instance Hero Banner */
+        <div className="relative rounded-3xl overflow-hidden border border-white/[0.14] bg-gradient-to-b from-galaxy-850/95 via-galaxy-900/90 to-galaxy-950/98 backdrop-blur-2xl shadow-2xl p-6 md:p-8 space-y-6 my-auto max-w-7xl mx-auto w-full">
+          {/* Glowing Nebula Auras */}
+          <div className="absolute top-0 right-0 -mt-16 -mr-16 w-96 h-96 rounded-full bg-cyan-500/15 blur-3xl pointer-events-none" />
+          <div className="absolute bottom-0 left-1/4 -mb-16 w-96 h-96 rounded-full bg-purple-600/15 blur-3xl pointer-events-none" />
+
+          <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+            {/* Instance Profile & Status */}
+            <div className="flex items-start md:items-center space-x-5 max-w-2xl">
+              {/* Clickable 3D Isometric Icon */}
+              <div
+                onClick={() => {
+                  sounds.playClick();
+                  setEditingIconInstance(selectedInstance);
+                }}
+                className="group relative cursor-pointer flex-shrink-0"
+                title="Click to customize 3D icon & background theme"
+              >
+                <InstanceIconRenderer
+                  icon={selectedInstance.icon || 'grass_block'}
+                  background={selectedInstance.iconBackground || 'obsidian'}
+                  size="xl"
+                  className="w-20 h-20 md:w-24 md:h-24 rounded-2xl group-hover:scale-105 transition-transform shadow-2xl"
+                />
+                <div className="absolute inset-0 bg-black/60 rounded-2xl opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-white text-[10px] font-semibold transition-opacity space-y-1">
+                  <Palette className="w-4 h-4 text-cyan-300" />
+                  <span>Customize</span>
+                </div>
+              </div>
+
+              <div className="space-y-2 min-w-0">
+                {/* Badges & Profile Switcher */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-mono font-semibold uppercase border shadow-sm ${getLoaderColor(selectedInstance.loader)}`}>
+                    {selectedInstance.loader || 'vanilla'} {selectedInstance.loaderVersion ? `(${selectedInstance.loaderVersion})` : ''}
+                  </span>
+                  <span className="text-xs font-mono text-slate-300 bg-white/[0.06] px-2.5 py-0.5 rounded-full border border-white/[0.09]">
+                    MC {selectedInstance.version || '1.21.1'}
+                  </span>
+                  <span className="text-xs font-mono text-purple-300 bg-purple-500/10 px-2.5 py-0.5 rounded-full border border-purple-500/25">
+                    {installedMods.length} Mods Active
+                  </span>
+
+                  {/* Direct Link to Cosmetics Wardrobe */}
+                  <button
+                    onClick={() => {
+                      sounds.playClick();
+                      onSelectTab?.('accounts');
+                    }}
+                    className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-semibold bg-gradient-to-r from-purple-500/20 to-pink-500/20 hover:from-purple-500/30 hover:to-pink-500/30 text-pink-300 border border-pink-500/30 flex items-center space-x-1.5 transition-all shadow-glow-sm hover:scale-105 active:scale-95 cursor-pointer"
+                    title="Open Galaxy Capes & Cosmetics Wardrobe"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-pink-400 animate-pulse" />
+                    <span>Cosmetics Wardrobe</span>
+                  </button>
+
+                  {/* Quick Profile Switcher Dropdown */}
+                  {instances.length > 1 && (
+                    <div className="relative">
+                      <button
+                        onClick={() => setInstanceDropdownOpen(!instanceDropdownOpen)}
+                        className="px-2.5 py-0.5 rounded-full bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[11px] font-mono flex items-center space-x-1 transition-colors"
+                      >
+                        <span>Switch Profile</span>
+                        <ChevronDown className="w-3 h-3 text-cyan-400" />
+                      </button>
+
+                      {instanceDropdownOpen && (
+                        <div className="absolute left-0 mt-1.5 w-60 rounded-2xl bg-galaxy-900 border border-white/[0.12] shadow-2xl py-1.5 z-50 backdrop-blur-2xl animate-in fade-in zoom-in-95 duration-100">
+                          <div className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-white/[0.06]">
+                            Select Instance Profile
+                          </div>
+                          <div className="max-h-56 overflow-y-auto">
+                            {instances.map((inst) => (
+                              <button
+                                key={inst.id}
+                                onClick={() => {
+                                  sounds.playClick();
+                                  onSelectInstance(inst);
+                                  setInstanceDropdownOpen(false);
+                                }}
+                                className={`w-full text-left px-3 py-2 flex items-center justify-between text-xs transition-colors ${
+                                  inst.id === selectedInstance.id
+                                    ? 'bg-cyan-500/15 text-cyan-300 font-bold'
+                                    : 'text-slate-300 hover:bg-white/[0.05]'
+                                }`}
+                              >
+                                <div className="flex items-center space-x-2 truncate">
+                                  <InstanceIconRenderer icon={inst.icon || 'grass_block'} background={inst.iconBackground || 'obsidian'} size="sm" />
+                                  <span className="truncate">{inst.name}</span>
+                                </div>
+                                <span className="text-[10px] font-mono text-slate-400 uppercase">{inst.loader}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center space-x-3">
+                  <h1 className="text-2xl md:text-3xl font-display font-extrabold text-white tracking-tight truncate">
+                    {selectedInstance.name || 'Untitled Instance'}
+                  </h1>
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      sounds.playClick();
+                      await window.galaxy?.toggleInstanceFavorite(selectedInstance.id);
+                      const updated = { ...selectedInstance, isFavorite: !selectedInstance.isFavorite };
+                      onUpdateInstance?.(updated);
+                      onShowToast?.({
+                        id: Math.random().toString(),
+                        type: 'info',
+                        title: updated.isFavorite ? 'Starred as Favorite' : 'Unstarred',
+                        message: `${selectedInstance.name} is now ${updated.isFavorite ? 'pinned to the top' : 'unstarred'}.`
+                      });
+                    }}
+                    className={`p-2 rounded-xl border transition-all ${
+                      selectedInstance.isFavorite
+                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-glow-sm'
+                        : 'bg-white/[0.05] text-slate-400 hover:text-amber-300 border-white/[0.08]'
+                    }`}
+                    title={selectedInstance.isFavorite ? 'Unstar Instance' : 'Star as Favorite Instance'}
+                  >
+                    <Star className="w-4 h-4 fill-current" />
+                  </button>
+                </div>
+
+                {/* Hardware & Spec Badges */}
+                <div className="flex flex-wrap items-center gap-2 pt-0.5 text-xs text-slate-400 font-mono">
+                  <div className="flex items-center space-x-1.5 bg-black/40 px-2.5 py-1 rounded-xl border border-white/[0.06]">
+                    <HardDrive className="w-3.5 h-3.5 text-purple-400" />
+                    <span>{selectedInstance.memoryMax ?? 4096} MB RAM</span>
+                  </div>
+                  <div className="flex items-center space-x-1.5 bg-black/40 px-2.5 py-1 rounded-xl border border-white/[0.06]">
+                    <Cpu className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>{selectedInstance.resolution?.width ?? 1920}x{selectedInstance.resolution?.height ?? 1080}</span>
+                  </div>
+                  {activeAccount && (
+                    <div className="flex items-center space-x-1.5 bg-black/40 px-2.5 py-1 rounded-xl border border-white/[0.06] text-emerald-300">
+                      <Users className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>{activeAccount.username}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
             {/* Launch Action Hub */}
-            <div className="flex flex-col items-center md:items-end space-y-3 min-w-[220px]">
+            <div className="flex flex-col items-stretch md:items-end space-y-3 min-w-[240px] shrink-0">
               {isRunning ? (
                 <button
                   onClick={() => {
                     sounds.playError();
                     onKill(selectedInstance);
                   }}
-                  className="w-full py-4 px-8 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold text-sm shadow-glow-sm hover:shadow-glow-md flex items-center justify-center space-x-2 transition-all transform hover:scale-[1.02] active:scale-[0.98]"
+                  className="w-full py-4 px-8 rounded-2xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-display font-bold text-sm shadow-glow-md flex items-center justify-center space-x-2.5 transition-all transform hover:scale-[1.02] active:scale-[0.98]"
                 >
                   <Square className="w-5 h-5 fill-current" />
-                  <span>STOP GAME</span>
+                  <span className="tracking-wider">STOP GAME</span>
                 </button>
               ) : (
                 <button
@@ -244,21 +1723,26 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     sounds.playLaunch();
                     onLaunch(selectedInstance);
                   }}
-                  className={`w-full py-4 px-8 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-500 to-cyan-400 hover:from-purple-500 hover:to-cyan-300 text-white font-bold text-base shadow-glow-md hover:shadow-glow-lg flex items-center justify-center space-x-2.5 transition-all transform hover:scale-[1.03] active:scale-[0.98] ${
+                  className={`relative group/btn w-full py-4 px-8 rounded-2xl bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 text-slate-950 font-display font-extrabold text-base shadow-glow-lg flex items-center justify-center space-x-2.5 transition-all transform hover:scale-[1.03] active:scale-[0.98] ${
                     isLaunching ? 'opacity-80 cursor-wait' : ''
                   }`}
                 >
-                  {isLaunching ? (
-                    <>
-                      <RefreshCw className="w-5 h-5 animate-spin" />
-                      <span>STARTING...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Play className="w-5 h-5 fill-current" />
-                      <span className="tracking-wider font-display">PLAY NOW</span>
-                    </>
-                  )}
+                  {/* Button ambient pulsing border */}
+                  <span className="absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-emerald-400 to-cyan-400 opacity-40 blur group-hover/btn:opacity-75 transition-opacity" />
+
+                  <span className="relative z-10 flex items-center space-x-2.5">
+                    {isLaunching ? (
+                      <>
+                        <RefreshCw className="w-5 h-5 animate-spin text-slate-950" />
+                        <span className="tracking-wider">INITIALIZING...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Play className="w-5 h-5 fill-current text-slate-950" />
+                        <span className="tracking-wider">PLAY NOW</span>
+                      </>
+                    )}
+                  </span>
                 </button>
               )}
 
@@ -269,30 +1753,42 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     sounds.playClick();
                     onOpenInstanceDetails(selectedInstance);
                   }}
-                  className="flex-1 py-2 px-3 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] text-xs font-medium text-slate-300 flex items-center justify-center space-x-1.5 transition-colors"
+                  className="flex-1 py-2 px-3 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] text-xs font-semibold text-slate-300 hover:text-white flex items-center justify-center space-x-1.5 transition-all active:scale-95"
                 >
                   <SettingsIcon className="w-3.5 h-3.5 text-purple-400" />
-                  <span>Configure</span>
+                  <span>Settings</span>
+                </button>
+                <button
+                  onClick={() => {
+                    sounds.playClick();
+                    setSharingInstance(selectedInstance);
+                  }}
+                  className="py-2 px-3 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-xs font-semibold text-emerald-300 hover:text-emerald-200 flex items-center justify-center space-x-1.5 transition-all active:scale-95"
+                  title="1-Click Instance Share Code (GLX-XXXX)"
+                >
+                  <Share2 className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Share</span>
                 </button>
                 <button
                   onClick={() => {
                     sounds.playClick();
                     onOpenFolder(selectedInstance);
                   }}
-                  className="py-2 px-3 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] text-xs font-medium text-slate-300 flex items-center justify-center transition-colors"
+                  className="py-2 px-3 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] text-xs font-semibold text-slate-300 hover:text-white flex items-center justify-center space-x-1.5 transition-all active:scale-95"
                   title="Open Instance Directory"
                 >
                   <FolderOpen className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Folder</span>
                 </button>
                 <button
                   onClick={() => {
                     sounds.playSuccess();
                     onOptimizeInstance(selectedInstance);
                   }}
-                  className="py-2 px-3 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-xs font-medium text-emerald-300 flex items-center justify-center space-x-1 transition-colors"
-                  title="1-Click Performance Boost (Sodium/Iris/Lithium)"
+                  className="py-2 px-3 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-xs font-semibold text-amber-300 hover:text-amber-200 flex items-center justify-center space-x-1 transition-all active:scale-95"
+                  title="1-Click Performance Boost (Sodium/Lithium/FerriteCore)"
                 >
-                  <Flame className="w-3.5 h-3.5 text-emerald-400" />
+                  <Flame className="w-3.5 h-3.5 text-amber-400" />
                   <span>Boost</span>
                 </button>
               </div>
@@ -301,13 +1797,13 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
           {/* Real-time Launch Progress Bar */}
           {isLaunching && (
-            <div className="mt-5 pt-4 border-t border-white/[0.08] space-y-2 animate-in fade-in duration-300">
+            <div className="pt-3 border-t border-white/[0.08] space-y-2 animate-in fade-in duration-300">
               <div className="flex items-center justify-between text-xs font-mono">
                 <span className="text-purple-300 font-medium flex items-center space-x-2">
                   <span className="w-2 h-2 rounded-full bg-purple-400 animate-ping" />
                   <span>{launchProgress.step}</span>
                 </span>
-                <span className="text-cyan-400">{launchProgress.progress}%</span>
+                <span className="text-cyan-400 font-bold">{launchProgress.progress}%</span>
               </div>
               <div className="w-full h-2 bg-black/40 rounded-full overflow-hidden border border-white/[0.06]">
                 <div
@@ -325,124 +1821,18 @@ export const HomeView: React.FC<HomeViewProps> = ({
         </div>
       )}
 
-      {/* Instances Grid / Quick Switcher */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <h2 className="text-base font-display font-bold text-white tracking-wide">
-              Installed Instances
-            </h2>
-            <span className="text-xs font-mono text-slate-400 bg-white/[0.06] px-2 py-0.5 rounded-full">
-              {instances.length}
-            </span>
-          </div>
-          <button
-            onClick={onCreateInstance}
-            className="text-xs text-purple-400 hover:text-purple-300 flex items-center space-x-1 transition-colors"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Add New</span>
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {instances.map((inst) => {
-            const isSelected = selectedInstance?.id === inst.id;
-            return (
-              <div
-                key={inst.id}
-                onClick={() => {
-                  sounds.playClick();
-                  onSelectInstance(inst);
-                }}
-                className={`group relative p-4 rounded-xl cursor-pointer transition-all border ${
-                  isSelected
-                    ? 'bg-galaxy-800/90 border-purple-500/50 shadow-glow-sm'
-                    : 'bg-galaxy-900/50 hover:bg-galaxy-850/80 border-white/[0.06] hover:border-white/[0.15]'
-                }`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="space-y-1.5">
-                    <div className="flex items-center space-x-2">
-                      <span className={`text-[10px] font-mono font-medium px-1.5 py-0.5 rounded uppercase border ${getLoaderColor(inst.loader)}`}>
-                        {inst.loader}
-                      </span>
-                      <span className="text-[10px] font-mono text-slate-400">
-                        {inst.version}
-                      </span>
-                    </div>
-                    <div className="font-semibold text-sm text-slate-100 group-hover:text-purple-300 transition-colors">
-                      {inst.name}
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      sounds.playClick();
-                      onOpenInstanceDetails(inst);
-                    }}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.08] transition-colors"
-                    title="Instance Details"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
-
-                <div className="mt-3 flex items-center justify-between text-[11px] text-slate-400 font-mono">
-                  <span>{inst.memoryMax} MB RAM</span>
-                  {inst.isRunning ? (
-                    <span className="flex items-center space-x-1 text-emerald-400 font-semibold">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      <span>RUNNING</span>
-                    </span>
-                  ) : (
-                    <span>{inst.lastPlayed ? new Date(inst.lastPlayed).toLocaleDateString() : 'Never played'}</span>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Cosmic Feature Spotlight */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-        <div className="p-4 rounded-xl bg-galaxy-900/50 border border-white/[0.06] flex items-start space-x-3.5">
-          <div className="p-2.5 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400">
-            <ShieldCheck className="w-5 h-5" />
-          </div>
-          <div className="space-y-1">
-            <h4 className="text-xs font-semibold text-slate-200">Total Instance Isolation</h4>
-            <p className="text-[11px] text-slate-400 leading-relaxed">
-              Every profile keeps separate mods, configs, saves, and shaderpacks without polluting other instances.
-            </p>
-          </div>
-        </div>
-
-        <div className="p-4 rounded-xl bg-galaxy-900/50 border border-white/[0.06] flex items-start space-x-3.5">
-          <div className="p-2.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
-            <Sparkles className="w-5 h-5" />
-          </div>
-          <div className="space-y-1">
-            <h4 className="text-xs font-semibold text-slate-200">Modrinth & Shaders Hub</h4>
-            <p className="text-[11px] text-slate-400 leading-relaxed">
-              Discover and 1-click install thousands of mods, Iris shaders, and resource packs directly inside Galaxy.
-            </p>
-          </div>
-        </div>
-
-        <div className="p-4 rounded-xl bg-galaxy-900/50 border border-white/[0.06] flex items-start space-x-3.5">
-          <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-            <Zap className="w-5 h-5" />
-          </div>
-          <div className="space-y-1">
-            <h4 className="text-xs font-semibold text-slate-200">Auto Java Matcher</h4>
-            <p className="text-[11px] text-slate-400 leading-relaxed">
-              Automatically identifies and routes Java 8, 17, or 21 according to Minecraft version rules.
-            </p>
-          </div>
-        </div>
+      {/* Bottom Interactive Scroll Hint (Navigates to Real Instances View) */}
+      <div
+        onClick={() => {
+          sounds.playSwitch();
+          onSelectTab?.('instances');
+        }}
+        className="cursor-pointer group flex flex-col items-center justify-center space-y-1 pb-14 text-slate-400 hover:text-cyan-300 transition-colors"
+      >
+        <span className="text-[11px] font-medium tracking-wide uppercase opacity-75 group-hover:opacity-100">
+          Scroll down to explore your Galaxy universe
+        </span>
+        <ChevronsDown className="w-4 h-4 animate-bounce text-cyan-400 group-hover:scale-125 transition-transform" />
       </div>
     </div>
   );

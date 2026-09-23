@@ -1,15 +1,19 @@
 {
   "name": "galaxy-launcher",
-  "version": "1.0.0",
+  "version": "1.0.4",
   "type": "module",
   "description": "Next-generation, modern, cosmic-themed Minecraft launcher for Premium & Cracked players",
   "main": "dist-electron/main/index.js",
   "scripts": {
     "dev": "vite",
+    "start": "electron .",
+    "launch": "npm run build && electron .",
     "build": "tsc && vite build && esbuild src/preload/index.ts --bundle --platform=node --outfile=dist-electron/preload/index.cjs --format=cjs --external:electron",
     "preview": "vite preview",
     "pack": "npm run build && electron-builder --dir",
     "dist": "npm run build && electron-builder --win nsis",
+    "release": "npm run build && electron-builder --win nsis --publish always",
+    "bump-and-release": "node scripts/publish-release.mjs",
     "setup": "npm run build && electron-builder --dir && node scripts/build-setup.mjs"
   },
   "build": {
@@ -20,7 +24,13 @@
     },
     "files": [
       "dist/**/*",
-      "dist-electron/**/*"
+      "dist-electron/**/*",
+      "build/**/*",
+      "public/**/*"
+    ],
+    "asarUnpack": [
+      "build/**/*",
+      "public/**/*"
     ],
     "win": {
       "target": [
@@ -39,7 +49,8 @@
     "publish": {
       "provider": "github",
       "owner": "G0DS0N92",
-      "repo": "Galaxy-Launcher"
+      "repo": "Galaxy-Launcher",
+      "releaseType": "release"
     }
   },
   "keywords": [

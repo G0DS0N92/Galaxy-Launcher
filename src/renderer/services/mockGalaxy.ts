@@ -1,4 +1,4 @@
-import { GalaxyAPI } from '../../preload/index';
+import { GalaxyAPI } from '../../preload/types';
 import { Instance, Account, LauncherSettings, JavaInstallation, Mod, ResourcePack, ShaderPack, WorldSave, MinecraftVersion, MarketplaceProject, MarketplaceVersion, LaunchProgress, LogEntry, CrashReportAnalysis } from '../../preload/types';
 
 export function setupMockGalaxy(): void {
@@ -18,7 +18,9 @@ export function setupMockGalaxy(): void {
       defaultRamMin: 2048,
       defaultRamMax: 4096,
       instancesDirectory: 'D:/Galaxy Launcher/instances',
-      firstTimeSetupCompleted: false
+      firstTimeSetupCompleted: false,
+      enableAchievementPopups: true,
+      startupAnimation: true
     };
 
     let mockMods: Record<string, Mod[]> = {
@@ -63,14 +65,24 @@ export function setupMockGalaxy(): void {
         mockInstances = mockInstances.filter(i => i.id !== id);
         return true;
       },
-      cloneInstance: async (id, newName) => {
+      cloneInstance: async (id, optionsOrName) => {
         const found = mockInstances.find(i => i.id === id);
         if (!found) return null;
-        const cloned: Instance = { ...found, id: id + '-clone', name: newName };
+        const name = typeof optionsOrName === 'string' ? optionsOrName : optionsOrName.name;
+        const cloned: Instance = { ...found, id: id + '-clone', name: name || `${found.name} (Copy)` };
         mockInstances.push(cloned);
         return cloned;
       },
+      toggleInstanceFavorite: async (id) => {
+        const found = mockInstances.find(i => i.id === id);
+        if (found) {
+          found.isFavorite = !found.isFavorite;
+          return true;
+        }
+        return false;
+      },
       getMods: async (id) => mockMods[id] || [],
+      importFiles: async (id, subDir, filePaths) => filePaths.length,
       toggleMod: async (id, filename, enabled) => {
         if (mockMods[id]) {
           mockMods[id] = mockMods[id].map(m => m.filename === filename ? { ...m, enabled } : m);
@@ -84,16 +96,51 @@ export function setupMockGalaxy(): void {
         return true;
       },
       getResourcePacks: async () => [
-        { filename: 'faithful_32x.zip', name: 'Faithful 32x', description: 'Enhanced high-res vanilla textures', enabled: true, path: '' },
-        { filename: 'bare_bones.zip', name: 'Bare Bones', description: 'Trailer aesthetic minimalist pack', enabled: true, path: '' }
+        { filename: 'faithful_32x.zip', name: 'Faithful 32x', version: 'v1.21', description: 'Enhanced high-res vanilla textures', enabled: true, authors: ['Faithful Team'], path: '' },
+        { filename: 'bare_bones.zip', name: 'Bare Bones', version: 'v1.20', description: 'Trailer aesthetic minimalist pack', enabled: true, authors: ['RobotPantaloons'], path: '' }
       ],
+      toggleResourcePack: async () => true,
+      deleteResourcePack: async () => true,
       getShaderPacks: async () => [
-        { filename: 'ComplementaryReimagined_r5.2.2.zip', name: 'Complementary Reimagined', enabled: true, path: '' },
-        { filename: 'BSL_v8.2.09.zip', name: 'BSL Shaders', enabled: true, path: '' }
+        { filename: 'BSL_v10.1.8.zip', name: 'BSL Shaders', version: '10.1.8', description: 'Bright, colorful, and distinct shaderpack.', enabled: true, authors: ['CaptTatsu'], path: '', icon: 'https://cdn.modrinth.com/data/Q1vvjJYV/2a611a3cb434fb52fb81fa5dace13c5d8b67e55d_96.webp', url: 'https://modrinth.com/shader/bsl-shaders' },
+        { filename: 'ComplementaryReimagined_r5.9.3.zip', name: 'Complementary Shaders - Reimagined', version: '5.9.3', description: 'Exceptional quality, detail, and performance.', enabled: true, authors: ['EminGT'], path: '', icon: 'https://cdn.modrinth.com/data/HVnmMxH1/79cb7c8123bbc54945305b2ebad6b8881efdf5f8_96.webp', url: 'https://modrinth.com/shader/complementary-reimagined' },
+        { filename: 'EclipseShaders.zip', name: 'Eclipse Shaders', version: 'Release', description: 'Atmospheric and balanced visuals.', enabled: true, authors: ['Community'], path: '', icon: 'https://cdn.modrinth.com/data/s8ZCVd1a/eabeacef221a8a550d446ede0c8d383aa8061b94_96.webp', url: 'https://modrinth.com/shader/eclipse-shaders' }
       ],
+      toggleShaderPack: async () => true,
+      deleteShaderPack: async () => true,
+      openExternal: async () => true,
       getWorldSaves: async () => [
         { folderName: 'Cosmic Survival', name: 'Cosmic Survival', lastPlayed: Date.now() - 3600000, sizeBytes: 1024 * 1024 * 24, gameMode: 'Survival' }
       ],
+      createWorldBackup: async (instId, saveFolderName) => ({
+        id: 'backup-' + Date.now(),
+        worldName: saveFolderName,
+        fileName: `${saveFolderName}_${Date.now()}.zip`,
+        created: Date.now(),
+        sizeBytes: 1024 * 1024 * 18,
+        filePath: 'C:/Galaxy/backups/' + saveFolderName + '.zip'
+      }),
+      listWorldBackups: async () => [],
+      restoreWorldBackup: async () => true,
+      deleteWorldBackup: async () => true,
+      importLocalModpack: async (filePath, customName) => {
+        const inst: Instance = {
+          id: 'imported-' + Date.now(),
+          name: customName || 'Imported Modpack',
+          version: '1.21.1',
+          loader: 'fabric',
+          createdAt: new Date().toISOString(),
+          lastPlayed: new Date().toISOString(),
+          playTimeMinutes: 0,
+          memoryMin: 2048,
+          memoryMax: 6144,
+          jvmProfile: 'aikar',
+          resolution: { width: 1920, height: 1080, fullscreen: false },
+          isRunning: false
+        };
+        mockInstances.push(inst);
+        return inst;
+      },
       openInstanceFolder: async () => {},
 
       getMojangVersions: async () => [
@@ -135,6 +182,19 @@ export function setupMockGalaxy(): void {
         mockAccounts.push(newAcc);
         return newAcc;
       },
+      verifyOfficialMinecraftAccount: async (usernameOrGamertag: string) => {
+        const trimmed = usernameOrGamertag.trim();
+        if (!trimmed) {
+          return { verified: false, username: '', uuid: '', error: 'Gamertag / Username cannot be empty.' };
+        }
+        return {
+          verified: true,
+          username: trimmed,
+          uuid: '069a79f4-44e9-4726-a5be-17906103666d',
+          skinUrl: `https://minotar.net/skin/${trimmed}`,
+          modelType: 'classic' as const
+        };
+      },
       removeAccount: async (id) => {
         mockAccounts = mockAccounts.filter(a => a.id !== id);
         return true;
@@ -148,12 +208,74 @@ export function setupMockGalaxy(): void {
         }
         return null;
       },
+      updateAccountCosmetics: async (id, cosmetics) => {
+        const found = mockAccounts.find(a => a.id === id);
+        if (found) {
+          found.cosmetics = cosmetics;
+          return found;
+        }
+        return null;
+      },
+
+      generateShareCode: async (instanceId) => {
+        const inst = mockInstances.find(i => i.id === instanceId) || mockInstances[0];
+        const randomNum = Math.floor(1000 + Math.random() * 9000);
+        const code = `GLX-${randomNum}`;
+        const payload = {
+          version: '1.0.4',
+          name: inst?.name || 'Shared Instance',
+          mcVersion: inst?.version || '1.20.1',
+          loader: inst?.loader || 'fabric',
+          modsCount: 0,
+          mods: []
+        };
+        const shareString = `GLX1_${btoa(JSON.stringify(payload))}`;
+        return {
+          code,
+          shareString,
+          instanceName: inst?.name || 'Shared Instance',
+          version: inst?.version || '1.20.1',
+          loader: inst?.loader || 'fabric',
+          modsCount: 0,
+          payload
+        };
+      },
+      importFromShareCode: async (codeOrPayload, customName) => {
+        const newId = 'inst-share-' + Date.now();
+        const newInst: Instance = {
+          id: newId,
+          name: customName || 'Imported Shared Instance',
+          version: '1.20.1',
+          loader: 'fabric',
+          icon: 'galaxy',
+          iconBackground: 'linear-gradient(135deg, #7928CA, #FF0080)',
+          createdAt: new Date().toISOString(),
+          lastPlayed: undefined,
+          playTimeMinutes: 0,
+          launchCount: 0,
+          memoryMin: 2048,
+          memoryMax: 4096,
+          resolution: { width: 1920, height: 1080, fullscreen: false }
+        };
+        mockInstances.push(newInst);
+        return newInst;
+      },
 
       detectAllJava: async () => [
         { path: 'C:\\Program Files\\Eclipse Adoptium\\jdk-21.0.11-hotspot\\bin\\java.exe', version: '21.0.11', majorVersion: 21, vendor: 'Eclipse Temurin', arch: '64-Bit', isDefault: true, isValid: true },
         { path: 'C:\\Program Files\\Java\\jdk-17.0.9\\bin\\java.exe', version: '17.0.9', majorVersion: 17, vendor: 'Oracle OpenJDK', arch: '64-Bit', isDefault: false, isValid: true }
       ],
       probeJava: async () => null,
+      downloadJava: async () => ({
+        path: 'C:\\Program Files\\Eclipse Adoptium\\jdk-21.0.11-hotspot\\bin\\javaw.exe',
+        version: '21.0.11',
+        majorVersion: 21,
+        vendor: 'Eclipse Adoptium',
+        arch: 'x64',
+        isDefault: true,
+        isValid: true
+      }),
+      checkJavaSetup: async () => ({ hasJava: true, javaCount: 1, instancesCount: mockInstances.length }),
 
       launchInstance: async (id) => {
         const inst = mockInstances.find(i => i.id === id);
@@ -249,7 +371,32 @@ export function setupMockGalaxy(): void {
           return [];
         }
       },
+      getMarketplaceVersionById: async (versionId: string) => {
+        try {
+          const res = await fetch(`https://api.modrinth.com/v2/version/${versionId}`);
+          const v = await res.json();
+          return {
+            id: v.id,
+            versionNumber: v.version_number,
+            name: v.name,
+            gameVersions: v.game_versions || [],
+            loaders: v.loaders || [],
+            files: (v.files || []).map((f: any) => ({
+              url: f.url,
+              filename: f.filename,
+              primary: f.primary,
+              size: f.size,
+              hashes: f.hashes || {}
+            })),
+            dependencies: v.dependencies || [],
+            datePublished: v.date_published
+          };
+        } catch {
+          return null;
+        }
+      },
       installMarketplaceItem: async () => 'installed.jar',
+      installMarketplaceModWithDependencies: async () => ({ installedFiles: ['mod.jar'], dependencyNames: [] }),
       installModpack: async () => 'modpack-inst-id',
 
       getSettings: async () => ({ ...mockSettings }),
@@ -257,27 +404,346 @@ export function setupMockGalaxy(): void {
 
       selectDirectory: async () => 'C:/Minecraft/Instances',
       selectFile: async () => null,
+      selectMultipleFiles: async () => [],
       openLauncherDir: async () => {},
       wipeAllData: async () => true,
 
       checkForUpdates: async () => ({
         status: 'not-available',
-        currentVersion: '1.0.0',
-        latestVersion: '1.0.0'
+        currentVersion: '1.0.4',
+        latestVersion: '1.0.4'
       }),
       downloadUpdate: async () => true,
       quitAndInstallUpdate: async () => {},
       getUpdateStatus: async () => ({
         status: 'not-available',
-        currentVersion: '1.0.0'
+        currentVersion: '1.0.4'
       }),
-      getAppVersion: async () => '1.0.0',
+      getAppVersion: async () => '1.0.4',
 
+      // Achievements & Progression
+      getAchievements: async () => [
+        {
+          id: 'welcome',
+          title: 'Welcome To The Galaxy',
+          description: 'Open Galaxy Launcher for the first time.',
+          icon: '🌌',
+          category: 'exploration',
+          rarity: 'common',
+          xp: 100,
+          unlocked: true,
+          unlockedAt: new Date().toISOString()
+        },
+        {
+          id: 'first_launch',
+          title: 'First Launch',
+          description: 'Create your first Minecraft instance.',
+          icon: '🚀',
+          category: 'instance',
+          rarity: 'common',
+          xp: 150,
+          unlocked: false
+        },
+        {
+          id: 'getting_started',
+          title: 'Getting Started',
+          description: 'Play Minecraft for 1 hour through Galaxy Launcher.',
+          icon: '🎮',
+          category: 'playtime',
+          rarity: 'uncommon',
+          xp: 250,
+          unlocked: false,
+          progress: { current: 0, max: 60, unit: 'minutes' }
+        },
+        {
+          id: 'time_traveler',
+          title: 'Time Traveler',
+          description: 'Accumulate 10 hours of Minecraft playtime through Galaxy Launcher.',
+          icon: '⏳',
+          category: 'playtime',
+          rarity: 'rare',
+          xp: 500,
+          unlocked: false,
+          progress: { current: 0, max: 600, unit: 'minutes' }
+        },
+        {
+          id: 'galaxy_explorer',
+          title: 'Galaxy Explorer',
+          description: 'Accumulate 50 hours of Minecraft playtime through Galaxy Launcher.',
+          icon: '🌠',
+          category: 'playtime',
+          rarity: 'epic',
+          xp: 1000,
+          unlocked: false,
+          progress: { current: 0, max: 3000, unit: 'minutes' }
+        },
+        {
+          id: 'veteran_traveler',
+          title: 'Veteran Traveler',
+          description: 'Accumulate 100 hours of Minecraft playtime through Galaxy Launcher.',
+          icon: '🪐',
+          category: 'playtime',
+          rarity: 'epic',
+          xp: 2000,
+          unlocked: false,
+          progress: { current: 0, max: 6000, unit: 'minutes' }
+        },
+        {
+          id: 'galaxy_legend',
+          title: 'Galaxy Legend',
+          description: 'Accumulate 500 hours of Minecraft playtime through Galaxy Launcher.',
+          icon: '👑',
+          category: 'playtime',
+          rarity: 'legendary',
+          xp: 5000,
+          unlocked: false,
+          progress: { current: 0, max: 30000, unit: 'minutes' }
+        },
+        {
+          id: 'modder',
+          title: 'Modder',
+          description: 'Install your first mod through the Galaxy Marketplace.',
+          icon: '🧩',
+          category: 'modding',
+          rarity: 'common',
+          xp: 150,
+          unlocked: false
+        },
+        {
+          id: 'galaxies_conquered',
+          title: 'Galaxies Conquered',
+          description: 'Unlock 100% of all other achievements in Galaxy Launcher.',
+          icon: '🏆',
+          category: 'mastery',
+          rarity: 'cosmic',
+          xp: 10000,
+          unlocked: false
+        },
+        {
+          id: 'into_clouds',
+          title: 'Into The Clouds',
+          description: 'Enable Galaxy Cloud for the first time.',
+          icon: '☁️',
+          category: 'cloud',
+          rarity: 'uncommon',
+          xp: 200,
+          unlocked: false
+        },
+        {
+          id: 'first_friend',
+          title: 'Friend',
+          description: 'Add your first Galaxy friend.',
+          icon: '👥',
+          category: 'social',
+          rarity: 'uncommon',
+          xp: 250,
+          unlocked: false
+        },
+        {
+          id: 'in_it_together',
+          title: 'In It Together',
+          description: 'Play on a server with a Galaxy friend.',
+          icon: '🤝',
+          category: 'social',
+          rarity: 'rare',
+          xp: 500,
+          unlocked: false
+        }
+      ],
+      getAchievementStats: async () => ({
+        totalUnlocked: 1,
+        totalAchievements: 12,
+        totalXp: 100,
+        level: 1,
+        levelProgress: 20,
+        totalPlaytimeHours: 0
+      }),
+      unlockAchievement: async () => true,
+      resetAchievements: async () => true,
+
+      // Galaxy Cloud & Cross-Device Sync
+      getCloudSyncState: async () => ({
+        enabled: true,
+        autoSync: true,
+        lastSyncedAt: new Date().toISOString(),
+        deviceId: 'mock-device-win',
+        deviceName: 'Galaxy Desktop Rig',
+        storageUsedBytes: 1024 * 1024 * 14.5,
+        storageMaxBytes: 1024 * 1024 * 1024 * 5,
+        syncStatus: 'synced',
+        cloudInstances: [
+          {
+            id: 'cloud-snap-1',
+            name: 'Cosmic Survival 1.21.1',
+            version: '1.21.1',
+            loader: 'fabric',
+            loaderVersion: '0.16.5',
+            memoryMin: 2048,
+            memoryMax: 4096,
+            modsCount: 14,
+            modsList: [
+              { filename: 'sodium-fabric.jar', name: 'Sodium', version: '0.5.11' },
+              { filename: 'iris-fabric.jar', name: 'Iris Shaders', version: '1.7.0' }
+            ],
+            shadersList: ['ComplementaryReimagined.zip'],
+            resourcePacksList: ['Faithful32x.zip'],
+            lastBackedUpAt: new Date(Date.now() - 3600000).toISOString(),
+            playTimeMinutes: 240,
+            sizeBytes: 1024 * 1024 * 14.5,
+            jvmArgs: '-Xmx4G'
+          }
+        ]
+      }),
+      toggleCloudSync: async (enabled) => ({
+        enabled,
+        autoSync: enabled,
+        lastSyncedAt: new Date().toISOString(),
+        deviceId: 'mock-device-win',
+        deviceName: 'Galaxy Desktop Rig',
+        storageUsedBytes: 1024 * 1024 * 14.5,
+        storageMaxBytes: 1024 * 1024 * 1024 * 5,
+        syncStatus: 'synced',
+        cloudInstances: []
+      }),
+      syncAllToCloud: async () => ({
+        enabled: true,
+        autoSync: true,
+        lastSyncedAt: new Date().toISOString(),
+        deviceId: 'mock-device-win',
+        deviceName: 'Galaxy Desktop Rig',
+        storageUsedBytes: 1024 * 1024 * 14.5,
+        storageMaxBytes: 1024 * 1024 * 1024 * 5,
+        syncStatus: 'synced',
+        cloudInstances: []
+      }),
+      backupInstanceToCloud: async () => null,
+      restoreInstanceFromCloud: async () => null,
+      deleteCloudInstance: async () => true,
+
+      // Galaxy Friends Network & Social
+      getFriends: async () => [],
+      addFriend: async (tag) => ({
+        id: 'friend-' + Date.now(),
+        username: tag.split('#')[0] || tag,
+        tag: tag.includes('#') ? tag : `${tag}#${Math.floor(1000 + Math.random() * 9000)}`,
+        avatarUrl: '',
+        status: 'online',
+        activity: 'Browsing Marketplace',
+        lastSeen: 'Now',
+        isFavorite: false
+      }),
+      removeFriend: async () => true,
+      toggleFavoriteFriend: async () => true,
+
+      getSocialProfile: async () => ({
+        username: 'CosmicExplorer',
+        tag: 'CosmicExplorer#1337',
+        status: 'online',
+        statusMessage: 'Venturing into the unknown void 🌌',
+        avatarUrl: '',
+        favoriteInstanceId: mockInstances[0]?.id || '',
+        favoriteInstanceName: mockInstances[0]?.name || 'None',
+        customBio: 'Cosmic Explorer & Modpack Creator',
+        joinedAt: 'Today'
+      }),
+      updateSocialProfile: async (data) => ({
+        username: 'CosmicExplorer',
+        tag: 'CosmicExplorer#1337',
+        status: 'online',
+        statusMessage: 'Venturing into the unknown void 🌌',
+        avatarUrl: '',
+        favoriteInstanceId: '',
+        favoriteInstanceName: 'None',
+        customBio: 'Cosmic Explorer & Modpack Creator',
+        joinedAt: 'Today',
+        ...data
+      }),
+      getFriendRequests: async () => [],
+      sendFriendRequest: async (tag) => ({
+        id: 'req-' + Date.now(),
+        senderUsername: 'CosmicExplorer',
+        senderTag: 'CosmicExplorer#1337',
+        createdAt: 'Just now',
+        type: 'outgoing'
+      }),
+      acceptFriendRequest: async () => null,
+      declineFriendRequest: async () => true,
+      getGameStats: async () => {
+        const totalMins = mockInstances.reduce((acc, i) => acc + (i.playTimeMinutes || 0), 0);
+        const totalL = mockInstances.reduce((acc, i) => acc + (i.launchCount || 0), 0);
+        const fav = mockInstances.find(i => i.isFavorite) || mockInstances[0];
+
+        return {
+          totalPlaytimeMinutes: totalMins,
+          totalPlaytimeHours: Math.floor(totalMins / 60),
+          totalLaunches: totalL,
+          instancesCount: mockInstances.length,
+          unlockedAchievementsCount: 0,
+          totalXp: 0,
+          galaxyLevel: 1,
+          favoriteInstanceName: fav?.name || 'None Selected',
+          instanceStats: mockInstances.map(i => ({
+            id: i.id,
+            name: i.name,
+            version: i.version,
+            loader: i.loader,
+            icon: i.icon,
+            iconBackground: i.iconBackground,
+            playTimeMinutes: i.playTimeMinutes || 0,
+            launchCount: i.launchCount || 0,
+            lastPlayed: i.lastPlayed,
+            isFavorite: Boolean(i.isFavorite)
+          }))
+        };
+      },
+
+      // Screenshots Archive
+      getScreenshots: async () => [],
+      getScreenshotsByInstance: async () => [],
+      deleteScreenshot: async () => true,
+      copyScreenshotToClipboard: async () => true,
+      openScreenshotFolder: async () => {},
+      getScreenshotBase64: async () => null,
+
+      // System Specs
+      getSystemSpecs: async () => ({
+        totalMemoryMb: 16384,
+        freeMemoryMb: 8192,
+        cpuModel: 'Intel(R) Core(TM) i7-13700H',
+        cpuCores: 16,
+        cpuSpeedMhz: 2900,
+        platform: 'win32',
+        arch: 'x64',
+        recommendedRamMb: 4096,
+        recommendedResolution: {
+          width: 1920,
+          height: 1080,
+          label: '1080p (Full HD) • Recommended Standard'
+        }
+      }),
+
+      // Tray & Achievements
+      toggleTray: async () => {},
+      showFromTray: async () => {},
+      hideToTray: async () => {},
+      testSoundAchievement: async () => 1,
+      themeChangedAchievement: async () => {},
+
+      onAchievementUnlocked: () => () => {},
+      onAchievementStatsUpdated: () => () => {},
+      onCloudSyncUpdated: () => () => {},
+      onFriendsUpdated: () => () => {},
+      onRequestsUpdated: () => () => {},
+      onProfileUpdated: () => () => {},
       onUpdateStatus: () => () => {},
       onLaunchProgress: () => () => {},
       onLog: () => () => {},
       onDownloadProgress: () => () => {},
-      onModpackProgress: () => () => {}
+      onModpackProgress: () => () => {},
+      onQuickLaunch: () => () => {},
+      onGameCrashed: () => () => {},
+      onGameStopped: () => () => {},
+      onJavaDownloadProgress: () => () => {}
     };
 
     window.galaxy = mockApi;
