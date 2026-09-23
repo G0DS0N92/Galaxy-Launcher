@@ -49,7 +49,10 @@ import {
   Camera,
   Share2,
   Copy,
-  Stethoscope
+  Stethoscope,
+  Package,
+  MoreVertical,
+  MoreHorizontal
 } from 'lucide-react';
 import { Instance, Account, LaunchProgress, Mod, Achievement, AchievementStats, CloneInstanceOptions } from '../../types';
 import { sounds } from '../../services/soundEngine';
@@ -115,6 +118,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [installedMods, setInstalledMods] = useState<Mod[]>([]);
   const [instanceDropdownOpen, setInstanceDropdownOpen] = useState(false);
+  const [instanceModCounts, setInstanceModCounts] = useState<Record<string, number>>({});
+  const [activeMenuInstanceId, setActiveMenuInstanceId] = useState<string | null>(null);
 
   // Quick Launch & Wheel Navigation state
   const [showLaunchModal, setShowLaunchModal] = useState(false);
@@ -123,6 +128,40 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
   const isLaunching = launchProgress && selectedInstance && launchProgress.instanceId === selectedInstance.id;
   const isRunning = selectedInstance?.isRunning;
+
+  // Load installed mods for all instances to show live accurate mod counts
+  useEffect(() => {
+    if (window.galaxy?.getMods && instances.length > 0) {
+      let isMounted = true;
+      Promise.all(
+        instances.map(async (inst) => {
+          try {
+            const m = await window.galaxy.getMods(inst.id);
+            return { id: inst.id, count: m?.length || 0 };
+          } catch {
+            return { id: inst.id, count: 0 };
+          }
+        })
+      ).then((results) => {
+        if (!isMounted) return;
+        const counts: Record<string, number> = {};
+        results.forEach((r) => {
+          counts[r.id] = r.count;
+        });
+        setInstanceModCounts(counts);
+      });
+      return () => {
+        isMounted = false;
+      };
+    }
+  }, [instances]);
+
+  // Close card context dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = () => setActiveMenuInstanceId(null);
+    window.addEventListener('click', handleClickOutside);
+    return () => window.removeEventListener('click', handleClickOutside);
+  }, []);
 
   // Load installed mods for active selected instance
   useEffect(() => {
@@ -231,6 +270,16 @@ export const HomeView: React.FC<HomeViewProps> = ({
       default:
         return 'from-emerald-500/20 to-teal-500/20 text-emerald-300 border-emerald-500/30';
     }
+  };
+
+  const formatPlaytimeShort = (mins?: number) => {
+    if (!mins || mins === 0) return '0m played';
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    if (h > 0) {
+      return `${h}h ${m > 0 ? `${m}m` : ''} played`.trim();
+    }
+    return `${m}m played`;
   };
 
   const handleSaveIcon = async (icon: string, background: string) => {
@@ -707,39 +756,55 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 </div>
               </div>
 
-              {/* Loader Filter Chips */}
-              <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-white/[0.05]">
-                {[
-                  { id: 'all', label: 'All Instances', count: loaderCounts.all },
-                  { id: 'fabric', label: 'Fabric', count: loaderCounts.fabric },
-                  { id: 'forge', label: 'Forge', count: loaderCounts.forge },
-                  { id: 'neoforge', label: 'NeoForge', count: loaderCounts.neoforge },
-                  { id: 'quilt', label: 'Quilt', count: loaderCounts.quilt },
-                  { id: 'vanilla', label: 'Vanilla', count: loaderCounts.vanilla }
-                ].map((chip) => {
-                  const isActive = selectedLoaderFilter === chip.id;
-                  return (
-                    <button
-                      key={chip.id}
-                      onClick={() => {
-                        sounds.playSwitch();
-                        setSelectedLoaderFilter(chip.id);
-                      }}
-                      className={`px-3 py-1 rounded-xl text-xs font-medium flex items-center space-x-1.5 transition-all ${
-                        isActive
-                          ? 'bg-purple-600 text-white shadow-glow-sm'
-                          : 'bg-white/[0.04] text-slate-400 hover:text-slate-200 hover:bg-white/[0.08] border border-white/[0.06]'
-                      }`}
-                    >
-                      <span>{chip.label}</span>
-                      <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-md ${
-                        isActive ? 'bg-black/30 text-white' : 'bg-white/[0.06] text-slate-400'
-                      }`}>
-                        {chip.count}
+              {/* Loader Filter Chips & Instance Counter */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-white/[0.05]">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {[
+                    { id: 'all', label: 'All', count: loaderCounts.all },
+                    { id: 'fabric', label: 'Fabric', count: loaderCounts.fabric },
+                    { id: 'forge', label: 'Forge', count: loaderCounts.forge },
+                    { id: 'neoforge', label: 'NeoForge', count: loaderCounts.neoforge },
+                    { id: 'quilt', label: 'Quilt', count: loaderCounts.quilt },
+                    { id: 'vanilla', label: 'Vanilla', count: loaderCounts.vanilla }
+                  ].map((chip) => {
+                    const isActive = selectedLoaderFilter === chip.id;
+                    return (
+                      <button
+                        key={chip.id}
+                        onClick={() => {
+                          sounds.playSwitch();
+                          setSelectedLoaderFilter(chip.id);
+                        }}
+                        className={`px-3 py-1 rounded-xl text-xs font-medium flex items-center space-x-1.5 transition-all ${
+                          isActive
+                            ? 'bg-purple-600 text-white shadow-glow-sm'
+                            : 'bg-white/[0.04] text-slate-400 hover:text-slate-200 hover:bg-white/[0.08] border border-white/[0.06]'
+                        }`}
+                      >
+                        <span>{chip.label}</span>
+                        <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-md ${
+                          isActive ? 'bg-black/30 text-white' : 'bg-white/[0.06] text-slate-400'
+                        }`}>
+                          {chip.count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Instance Total & Filtered Counter */}
+                <div className="text-[11px] font-mono text-slate-400 bg-galaxy-950/70 px-3 py-1 rounded-xl border border-white/[0.06] flex items-center space-x-2">
+                  <span>Showing <strong className="text-white font-bold">{filteredAndSortedInstances.length}</strong> of <strong className="text-white font-bold">{instances.length}</strong> Profiles</span>
+                  {instances.filter((i) => i.isFavorite).length > 0 && (
+                    <>
+                      <span className="text-slate-600">•</span>
+                      <span className="text-amber-400 flex items-center space-x-1" title="Starred Favorites">
+                        <Star className="w-3 h-3 fill-current" />
+                        <span>{instances.filter((i) => i.isFavorite).length}</span>
                       </span>
-                    </button>
-                  );
-                })}
+                    </>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -775,11 +840,13 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 </div>
               </div>
             ) : viewMode === 'grid' ? (
-              /* Grid View Mode */
-              <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,250px))] gap-4">
+              /* Redesigned Modern Spacious Grid View Mode */
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(230px,260px))] gap-4">
                 {filteredAndSortedInstances.map((inst) => {
                   const isSelected = selectedInstance?.id === inst.id;
                   const isInstRunning = inst.isRunning;
+                  const modCount = instanceModCounts[inst.id] ?? 0;
+
                   return (
                     <div
                       key={inst.id}
@@ -787,185 +854,262 @@ export const HomeView: React.FC<HomeViewProps> = ({
                         sounds.playClick();
                         onSelectInstance(inst);
                       }}
-                      className={`group relative p-3.5 rounded-2xl cursor-pointer transition-all border flex flex-col justify-between space-y-3 ${
+                      className={`group relative p-3 rounded-2xl cursor-pointer transition-all duration-300 border flex flex-col justify-between space-y-2.5 ${
                         isSelected
-                          ? 'bg-galaxy-800/90 border-purple-500/70 shadow-glow-md ring-1 ring-purple-500/50'
-                          : 'bg-galaxy-900/60 hover:bg-galaxy-850/80 border-white/[0.08] hover:border-white/[0.2] hover:translate-y-[-2px]'
+                          ? 'bg-gradient-to-b from-purple-950/40 via-galaxy-900/90 to-galaxy-950/95 border-purple-400/80 shadow-[0_0_25px_rgba(168,85,247,0.25)] ring-1 ring-purple-400/30'
+                          : 'bg-gradient-to-b from-galaxy-900/85 via-galaxy-900/60 to-galaxy-950/90 hover:bg-galaxy-850/90 border-white/[0.08] hover:border-purple-500/40 hover:-translate-y-1 hover:shadow-[0_12px_28px_rgba(0,0,0,0.55),0_0_20px_rgba(168,85,247,0.15)]'
                       }`}
                     >
-                      {/* Top Tile: 3D Isometric Icon & Overlay */}
-                      <div className="relative w-full h-28 rounded-xl bg-black/30 border border-white/[0.05] overflow-hidden flex items-center justify-center">
+                      {/* Top Showcase: 3D Isometric Icon & Smart Overlay */}
+                      <div className="relative w-full h-32 rounded-xl bg-gradient-to-b from-black/40 via-galaxy-950/60 to-black/60 border border-white/[0.06] overflow-hidden flex items-center justify-center group-hover:border-purple-500/30 transition-colors">
+                        {/* Radial ambient aura */}
+                        <div className="absolute inset-0 bg-radial from-purple-500/10 via-transparent to-transparent opacity-60 group-hover:opacity-100 transition-opacity" />
+
+                        {/* 3D Voxel Icon */}
                         <InstanceIconRenderer
                           icon={inst.icon || 'grass_block'}
                           background={inst.iconBackground || 'obsidian'}
                           size="lg"
-                          className="w-16 h-16 rounded-2xl shadow-lg transform group-hover:scale-105 transition-transform duration-300"
+                          className="w-16 h-16 rounded-2xl shadow-xl transform group-hover:scale-110 transition-transform duration-300"
                         />
 
-                        {/* Favorite badge */}
-                        {inst.isFavorite && (
-                          <div className="absolute top-2 left-2 p-1 rounded-lg bg-amber-500/30 text-amber-300 border border-amber-500/40 shadow-glow-sm z-10" title="Favorite Instance">
-                            <Star className="w-3.5 h-3.5 fill-current" />
-                          </div>
-                        )}
+                        {/* Favorite Star Button (Top-Left) */}
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            sounds.playClick();
+                            await window.galaxy?.toggleInstanceFavorite(inst.id);
+                            const updated = { ...inst, isFavorite: !inst.isFavorite };
+                            onUpdateInstance?.(updated);
+                            onShowToast?.({
+                              id: Math.random().toString(),
+                              type: 'info',
+                              title: updated.isFavorite ? 'Starred as Favorite' : 'Unstarred',
+                              message: `${inst.name} is now ${updated.isFavorite ? 'pinned to the top' : 'unstarred'}.`
+                            });
+                          }}
+                          className={`absolute top-2 left-2 p-1.5 rounded-xl border transition-all z-30 ${
+                            inst.isFavorite
+                              ? 'bg-amber-500/30 text-amber-300 border-amber-500/50 shadow-glow-sm scale-100'
+                              : 'bg-black/60 hover:bg-black/80 text-slate-400 hover:text-amber-300 border-white/10 opacity-0 group-hover:opacity-100 active:scale-95'
+                          }`}
+                          title={inst.isFavorite ? 'Unstar Instance' : 'Star as Favorite'}
+                        >
+                          <Star className="w-3.5 h-3.5 fill-current" />
+                        </button>
 
-                        {/* Running status badge */}
-                        {isInstRunning && (
-                          <div className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-emerald-500/90 text-slate-950 font-bold text-[10px] flex items-center space-x-1 shadow-lg animate-pulse z-10">
-                            <span className="w-1.5 h-1.5 rounded-full bg-slate-950" />
-                            <span>RUNNING</span>
-                          </div>
-                        )}
+                        {/* Top-Right Badges & 3-Dots Menu */}
+                        <div className="absolute top-2 right-2 flex items-center space-x-1.5 z-30">
+                          {isInstRunning && (
+                            <div className="px-2 py-0.5 rounded-full bg-emerald-500/90 text-slate-950 font-bold text-[10px] flex items-center space-x-1 shadow-lg animate-pulse">
+                              <span className="w-1.5 h-1.5 rounded-full bg-slate-950" />
+                              <span>RUNNING</span>
+                            </div>
+                          )}
 
-                        {/* Redesigned Modern Spacious Glassmorphic Hover Overlay */}
-                        <div className="absolute inset-0 bg-galaxy-950/85 backdrop-blur-md opacity-0 group-hover:opacity-100 flex flex-col justify-between p-2.5 transition-all duration-200 z-20 rounded-xl">
-                          {/* Top Action Bar */}
-                          <div className="flex items-center justify-between w-full">
-                            {/* Favorite Toggle */}
+                          {/* 3-Dots Dropdown Trigger */}
+                          <div className="relative">
                             <button
-                              onClick={async (e) => {
+                              onClick={(e) => {
                                 e.stopPropagation();
                                 sounds.playClick();
-                                await window.galaxy?.toggleInstanceFavorite(inst.id);
-                                const updated = { ...inst, isFavorite: !inst.isFavorite };
-                                onUpdateInstance?.(updated);
-                                onShowToast?.({
-                                  id: Math.random().toString(),
-                                  type: 'info',
-                                  title: updated.isFavorite ? 'Starred as Favorite' : 'Unstarred',
-                                  message: `${inst.name} is now ${updated.isFavorite ? 'pinned to the top' : 'unstarred'}.`
-                                });
+                                setActiveMenuInstanceId(activeMenuInstanceId === inst.id ? null : inst.id);
                               }}
-                              className={`p-1.5 rounded-lg border transition-all ${
-                                inst.isFavorite
-                                  ? 'bg-amber-500/30 text-amber-300 border-amber-500/50 shadow-glow-sm'
-                                  : 'bg-white/10 text-slate-400 hover:text-amber-300 hover:bg-white/20 border-white/10'
+                              className={`p-1.5 rounded-xl border transition-all ${
+                                activeMenuInstanceId === inst.id
+                                  ? 'bg-purple-600 text-white border-purple-400 shadow-glow-sm opacity-100'
+                                  : 'bg-black/60 hover:bg-black/80 text-slate-300 hover:text-white border-white/10 opacity-0 group-hover:opacity-100 active:scale-95'
                               }`}
-                              title={inst.isFavorite ? 'Unstar Instance' : 'Star as Favorite'}
+                              title="Instance Options"
                             >
-                              <Star className="w-3.5 h-3.5 fill-current" />
+                              <MoreVertical className="w-3.5 h-3.5" />
                             </button>
 
-                            {/* Top-Right Quick Utilities */}
-                            <div className="flex items-center space-x-1">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  sounds.playClick();
-                                  setHealthCheckingInstance(inst);
-                                }}
-                                className="p-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-300 border border-emerald-500/30 transition-all hover:scale-105 active:scale-95"
-                                title="Instance Health Checkup & Diagnostics"
+                            {/* Dropdown Menu Modal */}
+                            {activeMenuInstanceId === inst.id && (
+                              <div
+                                onClick={(e) => e.stopPropagation()}
+                                className="absolute right-0 mt-1.5 w-52 rounded-2xl bg-galaxy-900 border border-white/[0.14] shadow-2xl py-1.5 z-50 backdrop-blur-2xl animate-in fade-in zoom-in-95 duration-100 text-left"
                               >
-                                <Stethoscope className="w-3.5 h-3.5" />
-                              </button>
+                                <button
+                                  onClick={() => {
+                                    setActiveMenuInstanceId(null);
+                                    sounds.playClick();
+                                    setHealthCheckingInstance(inst);
+                                  }}
+                                  className="w-full px-3 py-2 text-left text-xs text-emerald-300 hover:bg-emerald-500/15 flex items-center space-x-2.5 transition-colors font-semibold"
+                                >
+                                  <Stethoscope className="w-4 h-4 text-emerald-400" />
+                                  <span>Run Health Checkup</span>
+                                </button>
 
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  sounds.playClick();
-                                  onOpenInstanceDetails(inst);
-                                }}
-                                className="p-1.5 rounded-lg bg-white/10 hover:bg-purple-600/40 text-slate-300 hover:text-purple-300 border border-white/10 transition-all hover:scale-105 active:scale-95"
-                                title="Configure Instance"
-                              >
-                                <SettingsIcon className="w-3.5 h-3.5" />
-                              </button>
+                                <button
+                                  onClick={() => {
+                                    setActiveMenuInstanceId(null);
+                                    sounds.playClick();
+                                    onOpenInstanceDetails(inst);
+                                  }}
+                                  className="w-full px-3 py-2 text-left text-xs text-slate-200 hover:bg-white/[0.08] flex items-center space-x-2.5 transition-colors"
+                                >
+                                  <SettingsIcon className="w-4 h-4 text-purple-400" />
+                                  <span>Configure & Mods</span>
+                                </button>
 
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  sounds.playClick();
-                                  setCloningInstance(inst);
-                                }}
-                                className="p-1.5 rounded-lg bg-white/10 hover:bg-purple-600/40 text-slate-300 hover:text-purple-300 border border-white/10 transition-all hover:scale-105 active:scale-95"
-                                title="Clone Instance"
-                              >
-                                <Copy className="w-3.5 h-3.5 text-purple-300" />
-                              </button>
+                                <button
+                                  onClick={() => {
+                                    setActiveMenuInstanceId(null);
+                                    sounds.playClick();
+                                    onOpenFolder(inst);
+                                  }}
+                                  className="w-full px-3 py-2 text-left text-xs text-slate-200 hover:bg-white/[0.08] flex items-center space-x-2.5 transition-colors"
+                                >
+                                  <FolderOpen className="w-4 h-4 text-cyan-400" />
+                                  <span>Open Folder</span>
+                                </button>
 
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  sounds.playClick();
-                                  setEditingIconInstance(inst);
-                                }}
-                                className="p-1.5 rounded-lg bg-white/10 hover:bg-cyan-600/40 text-slate-300 hover:text-cyan-300 border border-white/10 transition-all hover:scale-105 active:scale-95"
-                                title="Change Icon & Background"
-                              >
-                                <Palette className="w-3.5 h-3.5 text-cyan-300" />
-                              </button>
+                                <button
+                                  onClick={() => {
+                                    setActiveMenuInstanceId(null);
+                                    sounds.playClick();
+                                    setSharingInstance(inst);
+                                  }}
+                                  className="w-full px-3 py-2 text-left text-xs text-slate-200 hover:bg-white/[0.08] flex items-center space-x-2.5 transition-colors"
+                                >
+                                  <Share2 className="w-4 h-4 text-cyan-400" />
+                                  <span>Share Code (GLX)</span>
+                                </button>
 
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  sounds.playClick();
-                                  setDeletingInstance(inst);
-                                }}
-                                className="p-1.5 rounded-lg bg-white/10 hover:bg-rose-600 text-slate-400 hover:text-white border border-white/10 transition-all hover:scale-105 active:scale-95"
-                                title="Delete Instance"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
+                                <button
+                                  onClick={() => {
+                                    setActiveMenuInstanceId(null);
+                                    sounds.playClick();
+                                    setCloningInstance(inst);
+                                  }}
+                                  className="w-full px-3 py-2 text-left text-xs text-slate-200 hover:bg-white/[0.08] flex items-center space-x-2.5 transition-colors"
+                                >
+                                  <Copy className="w-4 h-4 text-purple-400" />
+                                  <span>Clone Instance</span>
+                                </button>
 
-                          {/* Center Prominent Play / Stop Button */}
-                          <div className="flex items-center justify-center my-auto">
-                            {isInstRunning ? (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  sounds.playError();
-                                  onKill(inst);
-                                }}
-                                className="w-10 h-10 rounded-full bg-rose-600 hover:bg-rose-500 text-white font-bold flex items-center justify-center shadow-lg hover:scale-110 active:scale-95 transition-all ring-2 ring-rose-400/40"
-                                title="Stop Game"
-                              >
-                                <Square className="w-4 h-4 fill-current" />
-                              </button>
-                            ) : (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  sounds.playLaunch();
-                                  onLaunch(inst);
-                                }}
-                                className="w-10 h-10 rounded-full bg-gradient-to-tr from-emerald-500 via-teal-400 to-cyan-400 text-slate-950 font-bold flex items-center justify-center shadow-[0_0_18px_rgba(16,185,129,0.6)] hover:scale-110 active:scale-95 transition-all ring-2 ring-emerald-400/40 pl-0.5"
-                                title="Launch Game"
-                              >
-                                <Play className="w-4 h-4 fill-current" />
-                              </button>
+                                <button
+                                  onClick={() => {
+                                    setActiveMenuInstanceId(null);
+                                    sounds.playClick();
+                                    setEditingIconInstance(inst);
+                                  }}
+                                  className="w-full px-3 py-2 text-left text-xs text-slate-200 hover:bg-white/[0.08] flex items-center space-x-2.5 transition-colors"
+                                >
+                                  <Palette className="w-4 h-4 text-pink-400" />
+                                  <span>Customize 3D Icon</span>
+                                </button>
+
+                                <div className="my-1 border-t border-white/[0.08]" />
+
+                                <button
+                                  onClick={() => {
+                                    setActiveMenuInstanceId(null);
+                                    sounds.playClick();
+                                    setDeletingInstance(inst);
+                                  }}
+                                  className="w-full px-3 py-2 text-left text-xs text-rose-400 hover:bg-rose-500/15 flex items-center space-x-2.5 transition-colors font-medium"
+                                >
+                                  <Trash2 className="w-4 h-4 text-rose-400" />
+                                  <span>Delete Instance</span>
+                                </button>
+                              </div>
                             )}
                           </div>
+                        </div>
 
-                          {/* Bottom Status Text */}
-                          <div className="text-center">
-                            <span className="text-[9px] font-mono font-bold tracking-wider uppercase text-slate-300/80">
-                              {isInstRunning ? 'STOP PROCESS' : 'START INSTANCE'}
-                            </span>
-                          </div>
+                        {/* Clean Center Hover Overlay: Play Now + Health Pill (Zero Clutter!) */}
+                        <div className="absolute inset-0 bg-galaxy-950/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center p-3 transition-all duration-200 z-20">
+                          {isInstRunning ? (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                sounds.playError();
+                                onKill(inst);
+                              }}
+                              className="px-5 py-2.5 rounded-full bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center space-x-2 ring-2 ring-rose-400/40"
+                            >
+                              <Square className="w-4 h-4 fill-current" />
+                              <span>STOP GAME</span>
+                            </button>
+                          ) : (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                sounds.playLaunch();
+                                onLaunch(inst);
+                              }}
+                              className="px-6 py-2.5 rounded-full bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 text-slate-950 font-display font-extrabold text-xs shadow-[0_0_20px_rgba(27,217,106,0.45)] hover:shadow-[0_0_28px_rgba(27,217,106,0.65)] hover:scale-105 active:scale-95 transition-all flex items-center space-x-2 ring-1 ring-emerald-300/60"
+                            >
+                              <Play className="w-4 h-4 fill-slate-950" />
+                              <span>PLAY NOW</span>
+                            </button>
+                          )}
+
+                          {/* Quick Health Pill on Hover */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              sounds.playClick();
+                              setHealthCheckingInstance(inst);
+                            }}
+                            className="mt-2.5 px-3 py-1 rounded-full bg-emerald-500/15 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 text-[10px] font-semibold flex items-center space-x-1.5 transition-all hover:scale-105"
+                          >
+                            <Stethoscope className="w-3 h-3 text-emerald-400" />
+                            <span>Health Checkup</span>
+                          </button>
                         </div>
                       </div>
 
-                      {/* Instance Metadata */}
-                      <div className="space-y-1.5 pt-1">
-                        <div className="font-display font-bold text-sm text-slate-100 truncate group-hover:text-purple-300 transition-colors">
-                          {inst.name || 'Untitled Instance'}
+                      {/* Bottom Info Section with Counters */}
+                      <div className="space-y-2 pt-1">
+                        {/* Title */}
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-display font-bold text-sm text-white truncate group-hover:text-purple-300 transition-colors" title={inst.name}>
+                            {inst.name || 'Untitled Instance'}
+                          </h3>
                         </div>
 
-                        <div className="flex items-center space-x-1.5">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-medium uppercase border ${getLoaderColor(inst.loader)}`}>
+                        {/* Badges Row with Real Mods Counter */}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {/* Loader */}
+                          <span className={`px-2 py-0.5 rounded-lg text-[10px] font-mono font-semibold uppercase border ${getLoaderColor(inst.loader)}`}>
                             {inst.loader || 'vanilla'}
                           </span>
-                          <span className="text-[10px] font-mono text-slate-400 bg-white/[0.05] px-1.5 py-0.5 rounded border border-white/[0.06]">
+
+                          {/* Version */}
+                          <span className="text-[10px] font-mono font-medium text-slate-300 bg-white/[0.06] px-2 py-0.5 rounded-lg border border-white/[0.08]">
                             MC {inst.version || '1.21.1'}
                           </span>
+
+                          {/* ⭐ MODS COUNTER BADGE */}
+                          {modCount > 0 ? (
+                            <span className="text-[10px] font-mono font-semibold text-purple-300 bg-purple-500/15 px-2 py-0.5 rounded-lg border border-purple-500/30 flex items-center space-x-1">
+                              <Package className="w-3 h-3 text-purple-400" />
+                              <span>{modCount} Mods</span>
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-mono font-semibold text-emerald-300/90 bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/25 flex items-center space-x-1">
+                              <Sparkles className="w-2.5 h-2.5 text-emerald-400" />
+                              <span>Vanilla</span>
+                            </span>
+                          )}
                         </div>
 
-                        <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono pt-1">
-                          <span>{inst.memoryMax ?? 4096} MB RAM</span>
-                          <span>{inst.lastPlayed ? new Date(inst.lastPlayed).toLocaleDateString() : 'Never'}</span>
+                        {/* Footer Row: RAM Counter + Playtime Counter */}
+                        <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono pt-1.5 border-t border-white/[0.06]">
+                          <span className="flex items-center space-x-1 text-slate-300">
+                            <Zap className="w-3 h-3 text-cyan-400" />
+                            <span>{inst.memoryMax ?? 4096} MB RAM</span>
+                          </span>
+
+                          <span className="flex items-center space-x-1 text-slate-400">
+                            <Clock className="w-3 h-3 text-slate-500" />
+                            <span>{formatPlaytimeShort(inst.playTimeMinutes)}</span>
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -973,11 +1117,13 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 })}
               </div>
             ) : (
-              /* List View Mode */
-              <div className="space-y-2">
+              /* Redesigned Modern Spacious List View Mode */
+              <div className="space-y-2.5">
                 {filteredAndSortedInstances.map((inst) => {
                   const isSelected = selectedInstance?.id === inst.id;
                   const isInstRunning = inst.isRunning;
+                  const modCount = instanceModCounts[inst.id] ?? 0;
+
                   return (
                     <div
                       key={inst.id}
@@ -987,10 +1133,11 @@ export const HomeView: React.FC<HomeViewProps> = ({
                       }}
                       className={`p-3.5 rounded-2xl cursor-pointer transition-all border flex items-center justify-between space-x-4 ${
                         isSelected
-                          ? 'bg-galaxy-800/90 border-purple-500/70 shadow-glow-sm'
-                          : 'bg-galaxy-900/60 hover:bg-galaxy-850/80 border-white/[0.08] hover:border-white/[0.18]'
+                          ? 'bg-gradient-to-r from-purple-950/40 via-galaxy-900/90 to-galaxy-950/95 border-purple-400/80 shadow-[0_0_20px_rgba(168,85,247,0.2)] ring-1 ring-purple-400/30'
+                          : 'bg-galaxy-900/70 hover:bg-galaxy-850/90 border-white/[0.08] hover:border-purple-500/40'
                       }`}
                     >
+                      {/* Left: Icon + Meta + Badges */}
                       <div className="flex items-center space-x-4 min-w-0">
                         <div
                           onClick={(e) => {
@@ -999,46 +1146,57 @@ export const HomeView: React.FC<HomeViewProps> = ({
                             setEditingIconInstance(inst);
                           }}
                           className="group/icon relative cursor-pointer flex-shrink-0"
-                          title="Edit Icon & Color"
+                          title="Click to edit 3D icon & theme"
                         >
                           <InstanceIconRenderer
                             icon={inst.icon || 'grass_block'}
                             background={inst.iconBackground || 'obsidian'}
                             size="md"
-                            className="w-12 h-12 rounded-xl group-hover/icon:scale-105 transition-transform"
+                            className="w-12 h-12 rounded-xl group-hover/icon:scale-105 transition-transform shadow-md"
                           />
                           <div className="absolute inset-0 bg-black/60 rounded-xl opacity-0 group-hover/icon:opacity-100 flex items-center justify-center text-white transition-opacity">
                             <Palette className="w-3.5 h-3.5 text-cyan-300" />
                           </div>
                         </div>
 
-                        <div className="space-y-1 min-w-0">
+                        <div className="space-y-1.5 min-w-0">
                           <div className="flex items-center space-x-2">
-                            <div className="font-display font-bold text-sm text-slate-100 truncate">
+                            <span className="font-display font-bold text-sm text-slate-100 truncate">
                               {inst.name || 'Untitled Instance'}
-                            </div>
+                            </span>
                             {isInstRunning && (
-                              <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-mono animate-pulse">
+                              <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-mono animate-pulse font-bold">
                                 RUNNING
                               </span>
                             )}
                           </div>
 
-                          <div className="flex items-center space-x-2 text-[11px] font-mono text-slate-400">
-                            <span className={`px-1.5 py-0.2 rounded border ${getLoaderColor(inst.loader)} uppercase`}>
+                          {/* Meta Chips Row */}
+                          <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono text-slate-400">
+                            <span className={`px-2 py-0.2 rounded-md border ${getLoaderColor(inst.loader)} uppercase font-semibold text-[10px]`}>
                               {inst.loader || 'vanilla'}
                             </span>
-                            <span>•</span>
                             <span>MC {inst.version || '1.21.1'}</span>
-                            <span>•</span>
-                            <span>{inst.memoryMax ?? 4096} MB RAM</span>
-                            <span>•</span>
-                            <span>{inst.lastPlayed ? `Played ${new Date(inst.lastPlayed).toLocaleDateString()}` : 'Never played'}</span>
+                            <span className="text-slate-600">•</span>
+                            {modCount > 0 ? (
+                              <span className="text-purple-300 bg-purple-500/15 px-2 py-0.2 rounded-md border border-purple-500/30 flex items-center space-x-1">
+                                <Package className="w-3 h-3 text-purple-400" />
+                                <span>{modCount} Mods</span>
+                              </span>
+                            ) : (
+                              <span className="text-emerald-300 bg-emerald-500/10 px-2 py-0.2 rounded-md border border-emerald-500/25">
+                                Vanilla
+                              </span>
+                            )}
+                            <span className="text-slate-600">•</span>
+                            <span className="text-cyan-300">{inst.memoryMax ?? 4096} MB RAM</span>
+                            <span className="text-slate-600">•</span>
+                            <span>{formatPlaytimeShort(inst.playTimeMinutes)}</span>
                           </div>
                         </div>
                       </div>
 
-                      {/* Actions */}
+                      {/* Right: Star + Play + Health + 3-Dots */}
                       <div className="flex items-center space-x-2 flex-shrink-0">
                         {/* Star Favorite Button */}
                         <button
@@ -1065,6 +1223,20 @@ export const HomeView: React.FC<HomeViewProps> = ({
                           <Star className="w-4 h-4 fill-current" />
                         </button>
 
+                        {/* Health Check Button */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            sounds.playClick();
+                            setHealthCheckingInstance(inst);
+                          }}
+                          className="p-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 transition-colors"
+                          title="Run Health Checkup"
+                        >
+                          <Stethoscope className="w-4 h-4" />
+                        </button>
+
+                        {/* Play / Stop Button */}
                         {isInstRunning ? (
                           <button
                             onClick={(e) => {
@@ -1084,73 +1256,113 @@ export const HomeView: React.FC<HomeViewProps> = ({
                               sounds.playLaunch();
                               onLaunch(inst);
                             }}
-                            className="px-4 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 font-bold text-xs flex items-center space-x-1.5 transition-all transform hover:scale-105 active:scale-95"
+                            className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 text-slate-950 font-bold text-xs flex items-center space-x-1.5 transition-all transform hover:scale-105 active:scale-95 shadow-glow-sm"
                           >
                             <Play className="w-3.5 h-3.5 fill-current" />
                             <span>Play</span>
                           </button>
                         )}
 
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            sounds.playClick();
-                            setHealthCheckingInstance(inst);
-                          }}
-                          className="p-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 transition-colors"
-                          title="Run Health Checkup"
-                        >
-                          <Stethoscope className="w-4 h-4" />
-                        </button>
+                        {/* 3-Dots Dropdown Trigger */}
+                        <div className="relative">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              sounds.playClick();
+                              setActiveMenuInstanceId(activeMenuInstanceId === inst.id ? null : inst.id);
+                            }}
+                            className={`p-2 rounded-xl border transition-all ${
+                              activeMenuInstanceId === inst.id
+                                ? 'bg-purple-600 text-white border-purple-400 shadow-glow-sm'
+                                : 'bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 border-white/[0.08]'
+                            }`}
+                            title="More Options"
+                          >
+                            <MoreVertical className="w-4 h-4" />
+                          </button>
 
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            sounds.playClick();
-                            onOpenInstanceDetails(inst);
-                          }}
-                          className="p-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] text-slate-300 transition-colors"
-                          title="Settings"
-                        >
-                          <SettingsIcon className="w-4 h-4 text-purple-400" />
-                        </button>
+                          {/* Dropdown Menu Modal */}
+                          {activeMenuInstanceId === inst.id && (
+                            <div
+                              onClick={(e) => e.stopPropagation()}
+                              className="absolute right-0 mt-1.5 w-52 rounded-2xl bg-galaxy-900 border border-white/[0.14] shadow-2xl py-1.5 z-50 backdrop-blur-2xl animate-in fade-in zoom-in-95 duration-100 text-left"
+                            >
+                              <button
+                                onClick={() => {
+                                  setActiveMenuInstanceId(null);
+                                  sounds.playClick();
+                                  onOpenInstanceDetails(inst);
+                                }}
+                                className="w-full px-3 py-2 text-left text-xs text-slate-200 hover:bg-white/[0.08] flex items-center space-x-2.5 transition-colors"
+                              >
+                                <SettingsIcon className="w-4 h-4 text-purple-400" />
+                                <span>Configure & Mods</span>
+                              </button>
 
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            sounds.playClick();
-                            setCloningInstance(inst);
-                          }}
-                          className="p-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] text-slate-300 transition-colors"
-                          title="Clone Instance"
-                        >
-                          <Copy className="w-4 h-4 text-purple-400" />
-                        </button>
+                              <button
+                                onClick={() => {
+                                  setActiveMenuInstanceId(null);
+                                  sounds.playClick();
+                                  onOpenFolder(inst);
+                                }}
+                                className="w-full px-3 py-2 text-left text-xs text-slate-200 hover:bg-white/[0.08] flex items-center space-x-2.5 transition-colors"
+                              >
+                                <FolderOpen className="w-4 h-4 text-cyan-400" />
+                                <span>Open Folder</span>
+                              </button>
 
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            sounds.playClick();
-                            onOpenFolder(inst);
-                          }}
-                          className="p-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] text-slate-300 transition-colors"
-                          title="Open Folder"
-                        >
-                          <FolderOpen className="w-4 h-4 text-cyan-400" />
-                        </button>
+                              <button
+                                onClick={() => {
+                                  setActiveMenuInstanceId(null);
+                                  sounds.playClick();
+                                  setSharingInstance(inst);
+                                }}
+                                className="w-full px-3 py-2 text-left text-xs text-slate-200 hover:bg-white/[0.08] flex items-center space-x-2.5 transition-colors"
+                              >
+                                <Share2 className="w-4 h-4 text-cyan-400" />
+                                <span>Share Code (GLX)</span>
+                              </button>
 
-                        {/* Direct Delete in List View */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            sounds.playClick();
-                            setDeletingInstance(inst);
-                          }}
-                          className="p-2 rounded-xl bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 transition-all"
-                          title="Delete Instance"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                              <button
+                                onClick={() => {
+                                  setActiveMenuInstanceId(null);
+                                  sounds.playClick();
+                                  setCloningInstance(inst);
+                                }}
+                                className="w-full px-3 py-2 text-left text-xs text-slate-200 hover:bg-white/[0.08] flex items-center space-x-2.5 transition-colors"
+                              >
+                                <Copy className="w-4 h-4 text-purple-400" />
+                                <span>Clone Instance</span>
+                              </button>
+
+                              <button
+                                onClick={() => {
+                                  setActiveMenuInstanceId(null);
+                                  sounds.playClick();
+                                  setEditingIconInstance(inst);
+                                }}
+                                className="w-full px-3 py-2 text-left text-xs text-slate-200 hover:bg-white/[0.08] flex items-center space-x-2.5 transition-colors"
+                              >
+                                <Palette className="w-4 h-4 text-pink-400" />
+                                <span>Customize 3D Icon</span>
+                              </button>
+
+                              <div className="my-1 border-t border-white/[0.08]" />
+
+                              <button
+                                onClick={() => {
+                                  setActiveMenuInstanceId(null);
+                                  sounds.playClick();
+                                  setDeletingInstance(inst);
+                                }}
+                                className="w-full px-3 py-2 text-left text-xs text-rose-400 hover:bg-rose-500/15 flex items-center space-x-2.5 transition-colors font-medium"
+                              >
+                                <Trash2 className="w-4 h-4 text-rose-400" />
+                                <span>Delete Instance</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   );
