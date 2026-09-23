@@ -48,7 +48,8 @@ import {
   Rocket,
   Camera,
   Share2,
-  Copy
+  Copy,
+  Stethoscope
 } from 'lucide-react';
 import { Instance, Account, LaunchProgress, Mod, Achievement, AchievementStats, CloneInstanceOptions } from '../../types';
 import { sounds } from '../../services/soundEngine';
@@ -56,6 +57,7 @@ import { InstanceIconRenderer, IconEditorModal } from '../instances/instanceIcon
 import { ConfirmModal } from '../common/ConfirmModal';
 import { ShareInstanceModal } from '../instances/ShareInstanceModal';
 import { CloneInstanceModal } from '../instances/CloneInstanceModal';
+import { InstanceHealthModal } from '../instances/InstanceHealthModal';
 import { TabType } from '../layout/Sidebar';
 
 interface HomeViewProps {
@@ -103,6 +105,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
   const [deletingInstance, setDeletingInstance] = useState<Instance | null>(null);
   const [sharingInstance, setSharingInstance] = useState<Instance | null>(null);
   const [cloningInstance, setCloningInstance] = useState<Instance | null>(null);
+  const [healthCheckingInstance, setHealthCheckingInstance] = useState<Instance | null>(null);
   const [isDeletingLoading, setIsDeletingLoading] = useState(false);
 
   // Instances tab search & filter state
@@ -849,6 +852,18 @@ export const HomeView: React.FC<HomeViewProps> = ({
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   sounds.playClick();
+                                  setHealthCheckingInstance(inst);
+                                }}
+                                className="p-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-300 border border-emerald-500/30 transition-all hover:scale-105 active:scale-95"
+                                title="Instance Health Checkup & Diagnostics"
+                              >
+                                <Stethoscope className="w-3.5 h-3.5" />
+                              </button>
+
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  sounds.playClick();
                                   onOpenInstanceDetails(inst);
                                 }}
                                 className="p-1.5 rounded-lg bg-white/10 hover:bg-purple-600/40 text-slate-300 hover:text-purple-300 border border-white/10 transition-all hover:scale-105 active:scale-95"
@@ -1080,6 +1095,18 @@ export const HomeView: React.FC<HomeViewProps> = ({
                           onClick={(e) => {
                             e.stopPropagation();
                             sounds.playClick();
+                            setHealthCheckingInstance(inst);
+                          }}
+                          className="p-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 transition-colors"
+                          title="Run Health Checkup"
+                        >
+                          <Stethoscope className="w-4 h-4" />
+                        </button>
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            sounds.playClick();
                             onOpenInstanceDetails(inst);
                           }}
                           className="p-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] text-slate-300 transition-colors"
@@ -1201,6 +1228,19 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   message: `Cloned "${cloned.name}" successfully.`
                 });
               }
+            }
+          }}
+        />
+      )}
+
+      {/* Instance Health Checkup & Diagnostics Modal */}
+      {healthCheckingInstance && (
+        <InstanceHealthModal
+          instance={healthCheckingInstance}
+          onClose={() => setHealthCheckingInstance(null)}
+          onInstanceUpdated={async (updatedInst) => {
+            if (onUpdateInstance) {
+              await onUpdateInstance(updatedInst);
             }
           }}
         />
@@ -1763,11 +1803,22 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     sounds.playClick();
                     setSharingInstance(selectedInstance);
                   }}
-                  className="py-2 px-3 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-xs font-semibold text-emerald-300 hover:text-emerald-200 flex items-center justify-center space-x-1.5 transition-all active:scale-95"
+                  className="py-2 px-3 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-xs font-semibold text-cyan-300 hover:text-cyan-200 flex items-center justify-center space-x-1.5 transition-all active:scale-95"
                   title="1-Click Instance Share Code (GLX-XXXX)"
                 >
-                  <Share2 className="w-3.5 h-3.5 text-emerald-400" />
+                  <Share2 className="w-3.5 h-3.5 text-cyan-400" />
                   <span>Share</span>
+                </button>
+                <button
+                  onClick={() => {
+                    sounds.playClick();
+                    setHealthCheckingInstance(selectedInstance);
+                  }}
+                  className="py-2 px-3 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-xs font-semibold text-emerald-300 hover:text-emerald-200 flex items-center justify-center space-x-1.5 transition-all active:scale-95"
+                  title="Instance Health Checkup & Conflict Diagnostics"
+                >
+                  <Stethoscope className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Health</span>
                 </button>
                 <button
                   onClick={() => {
@@ -1777,7 +1828,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   className="py-2 px-3 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] text-xs font-semibold text-slate-300 hover:text-white flex items-center justify-center space-x-1.5 transition-all active:scale-95"
                   title="Open Instance Directory"
                 >
-                  <FolderOpen className="w-3.5 h-3.5 text-cyan-400" />
+                  <FolderOpen className="w-3.5 h-3.5 text-purple-400" />
                   <span>Folder</span>
                 </button>
                 <button

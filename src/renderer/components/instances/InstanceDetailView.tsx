@@ -50,7 +50,8 @@ import {
   CheckSquare,
   Square as SquareIcon,
   ExternalLink,
-  Loader2
+  Loader2,
+  Stethoscope
 } from 'lucide-react';
 import { Instance, Mod, ResourcePack, ShaderPack, WorldSave, JavaInstallation, ScreenshotItem, MarketplaceVersion, CloneInstanceOptions } from '../../types';
 import { sounds } from '../../services/soundEngine';
@@ -60,6 +61,7 @@ import { PromptModal } from '../common/PromptModal';
 import { ShareInstanceModal } from './ShareInstanceModal';
 import { AddContentModal } from './AddContentModal';
 import { CloneInstanceModal } from './CloneInstanceModal';
+import { InstanceHealthModal } from './InstanceHealthModal';
 
 interface InstanceDetailViewProps {
   instance: Instance;
@@ -139,6 +141,7 @@ export const InstanceDetailView: React.FC<InstanceDetailViewProps> = ({
   const [showDeleteInstanceModal, setShowDeleteInstanceModal] = useState(false);
   const [showCloneModal, setShowCloneModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showHealthModal, setShowHealthModal] = useState(false);
   const [showAddContentModal, setShowAddContentModal] = useState(false);
   const [addContentType, setAddContentType] = useState<'mod' | 'shader' | 'resourcepack' | 'modpack'>('mod');
   const [showAddContentMenu, setShowAddContentMenu] = useState(false);
@@ -1159,6 +1162,19 @@ export const InstanceDetailView: React.FC<InstanceDetailViewProps> = ({
             <span className="hidden sm:inline">Share</span>
           </button>
 
+          {/* Instance Health Checkup & Diagnostics Button */}
+          <button
+            onClick={() => {
+              sounds.playClick();
+              setShowHealthModal(true);
+            }}
+            className="px-3.5 py-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center space-x-1.5 text-xs font-bold transition-all hover:scale-105 active:scale-95 shadow-[0_0_12px_rgba(16,185,129,0.15)]"
+            title="Instance Health Checkup & Diagnostics"
+          >
+            <Stethoscope className="w-4 h-4 text-emerald-400" />
+            <span className="hidden sm:inline">Health Check</span>
+          </button>
+
           {/* Quick Settings Gear Icon */}
           <button
             onClick={() => {
@@ -1195,6 +1211,18 @@ export const InstanceDetailView: React.FC<InstanceDetailViewProps> = ({
                   onClick={() => setShowHeaderMoreMenu(false)}
                 />
                 <div className="absolute right-0 mt-2 w-52 rounded-2xl bg-galaxy-900 border border-white/[0.1] shadow-2xl py-1.5 z-40 animate-in fade-in zoom-in-95 duration-150">
+                  <button
+                    onClick={() => {
+                      setShowHeaderMoreMenu(false);
+                      sounds.playClick();
+                      setShowHealthModal(true);
+                    }}
+                    className="w-full px-3.5 py-2 text-left text-xs text-slate-200 hover:bg-white/[0.06] flex items-center space-x-2.5"
+                  >
+                    <Stethoscope className="w-4 h-4 text-emerald-400" />
+                    <span>Run Health Checkup</span>
+                  </button>
+
                   <button
                     onClick={() => {
                       setShowHeaderMoreMenu(false);
@@ -3619,6 +3647,18 @@ export const InstanceDetailView: React.FC<InstanceDetailViewProps> = ({
           initialType={addContentType}
           onContentChanged={loadInstanceData}
           onShowToast={onShowToast}
+        />
+      )}
+
+      {/* Instance Health Checkup & Conflict Diagnostics Modal */}
+      {showHealthModal && (
+        <InstanceHealthModal
+          instance={instance}
+          onClose={() => setShowHealthModal(false)}
+          onInstanceUpdated={async (updatedInst) => {
+            await onUpdateInstance(updatedInst);
+            await loadInstanceData();
+          }}
         />
       )}
     </div>

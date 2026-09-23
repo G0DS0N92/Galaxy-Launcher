@@ -14,6 +14,7 @@ import { AchievementsManager } from './achievementsManager';
 import { CloudService } from './cloudService';
 import { ScreenshotsManager } from './screenshotsManager';
 import { TrayManager } from './trayManager';
+import { HealthCheckService } from './healthCheckService';
 import { LauncherSettings, ModLoader } from '../preload/types';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -74,6 +75,7 @@ const achievementsManager = new AchievementsManager(launcherDir);
 const cloudService = new CloudService(launcherDir, instanceManager);
 const screenshotsManager = new ScreenshotsManager(launcherDir, instanceManager);
 const trayManager = new TrayManager();
+const healthCheckService = new HealthCheckService(launcherDir, instanceManager);
 
 function getSavedSettings(): LauncherSettings {
   const defaultSettings: LauncherSettings = {
@@ -572,6 +574,29 @@ function setupIpcHandlers() {
 
   ipcMain.handle('game:analyzeCrash', async (_, logs: any[]) => {
     return MinecraftLauncher.analyzeCrashLog(logs);
+  });
+
+  // --- Instance Health Checkup & Diagnostics ---
+  ipcMain.handle('health:check', async (_, instanceId: string) => {
+    return healthCheckService.analyzeInstanceHealth(instanceId);
+  });
+  ipcMain.handle('health:updateMod', async (_, instanceId: string, oldFileName: string, newDownloadUrl: string, newFileName: string, sha1?: string) => {
+    return healthCheckService.updateMod(instanceId, oldFileName, newDownloadUrl, newFileName, sha1);
+  });
+  ipcMain.handle('health:updateAllMods', async (_, instanceId: string, updates: any[]) => {
+    return healthCheckService.updateAllMods(instanceId, updates);
+  });
+  ipcMain.handle('health:disableMod', async (_, instanceId: string, fileName: string) => {
+    return healthCheckService.disableMod(instanceId, fileName);
+  });
+  ipcMain.handle('health:deleteMod', async (_, instanceId: string, fileName: string) => {
+    return healthCheckService.deleteMod(instanceId, fileName);
+  });
+  ipcMain.handle('health:installDependency', async (_, instanceId: string, dependencySlug: string) => {
+    return healthCheckService.installMissingDependency(instanceId, dependencySlug);
+  });
+  ipcMain.handle('health:optimizeRam', async (_, instanceId: string, recommendedMaxMb: number) => {
+    return healthCheckService.optimizeInstanceRam(instanceId, recommendedMaxMb);
   });
 
   // --- Marketplace ---

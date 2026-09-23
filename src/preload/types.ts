@@ -602,6 +602,15 @@ export interface GalaxyAPI {
   declineFriendRequest: (id: string) => Promise<boolean>;
   getGameStats: () => Promise<GlobalGameStats>;
 
+  // Instance Health & Diagnostics
+  checkInstanceHealth: (instanceId: string) => Promise<InstanceHealthReport>;
+  updateHealthMod: (instanceId: string, oldFileName: string, newDownloadUrl: string, newFileName: string, sha1?: string) => Promise<boolean>;
+  updateAllHealthMods: (instanceId: string, updates: { oldFileName: string; downloadUrl: string; newFileName: string; sha1?: string }[]) => Promise<{ updated: number; failed: number }>;
+  disableHealthMod: (instanceId: string, fileName: string) => Promise<boolean>;
+  deleteHealthMod: (instanceId: string, fileName: string) => Promise<boolean>;
+  installHealthDependency: (instanceId: string, dependencySlug: string) => Promise<boolean>;
+  optimizeHealthRam: (instanceId: string, recommendedMaxMb: number) => Promise<boolean>;
+
   // Event Listeners
   onQuickLaunch: (callback: (instanceId: string) => void) => () => void;
   onFriendsUpdated: (callback: (friends: GalaxyFriend[]) => void) => () => void;
@@ -618,6 +627,98 @@ export interface GalaxyAPI {
   onGameCrashed: (callback: (data: { instanceId: string; instanceName: string; analysis: CrashReportAnalysis; code: number }) => void) => () => void;
   onGameStopped: (callback: (data: { instanceId: string; code: number }) => void) => () => void;
 }
+
+// ----------------------------------------------------
+// Health Checkup & Diagnostics Types
+// ----------------------------------------------------
+export interface HealthModInfo {
+  fileName: string;
+  modId: string;
+  name: string;
+  version: string;
+  description?: string;
+  dependencies: string[];
+  disabled: boolean;
+  isCompatible: boolean;
+}
+
+export interface HealthModConflict {
+  type: 'incompatible' | 'duplicate' | 'missing_dependency';
+  severity: 'error' | 'warning';
+  modA: string;
+  modB: string;
+  modAFile?: string;
+  modBFile?: string;
+  description: string;
+  fixAction: 'disable_mod' | 'disable_duplicate' | 'delete_mod' | 'install_dependency';
+  fixTargetFile?: string;
+  suggestion?: string;
+}
+
+export interface HealthModUpdate {
+  modName: string;
+  currentVersion: string;
+  latestVersion: string;
+  oldFileName: string;
+  newFileName: string;
+  downloadUrl: string;
+  sha1?: string;
+}
+
+export interface HealthJavaCheck {
+  installedVersion: string;
+  requiredVersion: string;
+  javaPath: string;
+  isCompatible: boolean;
+  message: string;
+}
+
+export interface HealthMemoryCheck {
+  allocatedMinMb: number;
+  allocatedMaxMb: number;
+  totalSystemRamMb: number;
+  recommendedMinMb: number;
+  recommendedMaxMb: number;
+  status: 'optimal' | 'low' | 'excessive' | 'warning';
+  message: string;
+}
+
+export interface HealthFileCheck {
+  isHealthy: boolean;
+  hasCorruptedOptions: boolean;
+  hasStaleSessionLock: boolean;
+  issues: string[];
+}
+
+export interface HealthCrashCheck {
+  recentCrashCount: number;
+  latestCrashSummary?: string;
+}
+
+export interface InstanceHealthReport {
+  instanceId: string;
+  instanceName: string;
+  gameVersion: string;
+  loader: ModLoader;
+  score: number; // 0 - 100
+  status: 'healthy' | 'warning' | 'critical';
+  scannedAt: string;
+  mods: {
+    totalInstalled: number;
+    compatibleCount: number;
+    outdatedCount: number;
+    conflictCount: number;
+    items: HealthModInfo[];
+    conflicts: HealthModConflict[];
+    updates: HealthModUpdate[];
+    missingDependencies: { modName: string; requiredDependency: string; dependencySlug: string }[];
+  };
+  java: HealthJavaCheck;
+  memory: HealthMemoryCheck;
+  files: HealthFileCheck;
+  crashes: HealthCrashCheck;
+}
+
 
 
 

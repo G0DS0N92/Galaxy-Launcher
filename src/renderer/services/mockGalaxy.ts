@@ -729,6 +729,65 @@ export function setupMockGalaxy(): void {
       testSoundAchievement: async () => 1,
       themeChangedAchievement: async () => {},
 
+      // Instance Health & Diagnostics
+      checkInstanceHealth: async (instanceId: string) => ({
+        instanceId,
+        instanceName: 'Cosmic Fabric',
+        gameVersion: '1.20.4',
+        loader: 'fabric' as const,
+        score: 94,
+        status: 'healthy' as const,
+        scannedAt: new Date().toISOString(),
+        mods: {
+          totalInstalled: 5,
+          compatibleCount: 5,
+          outdatedCount: 0,
+          conflictCount: 0,
+          items: [
+            { fileName: 'fabric-api-0.92.0.jar', modId: 'fabric-api', name: 'Fabric API', version: '0.92.0', dependencies: [], disabled: false, isCompatible: true },
+            { fileName: 'sodium-fabric-0.5.11.jar', modId: 'sodium', name: 'Sodium', version: '0.5.11', dependencies: ['fabric-api'], disabled: false, isCompatible: true },
+            { fileName: 'iris-fabric-1.7.0.jar', modId: 'iris', name: 'Iris Shaders', version: '1.7.0', dependencies: ['sodium'], disabled: false, isCompatible: true },
+            { fileName: 'lithium-fabric-0.12.7.jar', modId: 'lithium', name: 'Lithium', version: '0.12.7', dependencies: [], disabled: false, isCompatible: true },
+            { fileName: 'ferrite-core-6.0.3.jar', modId: 'ferritecore', name: 'FerriteCore', version: '6.0.3', dependencies: [], disabled: false, isCompatible: true }
+          ],
+          conflicts: [],
+          updates: [],
+          missingDependencies: []
+        },
+        java: {
+          installedVersion: '21.0.2',
+          requiredVersion: '21',
+          javaPath: 'C:\\Program Files\\Eclipse Adoptium\\jdk-21.0.2.13-hotspot\\bin\\javaw.exe',
+          isCompatible: true,
+          message: 'Using compatible Java 21 LTS 64-bit runtime'
+        },
+        memory: {
+          allocatedMinMb: 2048,
+          allocatedMaxMb: 4096,
+          totalSystemRamMb: 16384,
+          recommendedMinMb: 2048,
+          recommendedMaxMb: 4096,
+          status: 'optimal' as const,
+          message: '4096 MB RAM is perfectly balanced for 5 active mods'
+        },
+        files: {
+          isHealthy: true,
+          hasCorruptedOptions: false,
+          hasStaleSessionLock: false,
+          issues: []
+        },
+        crashes: {
+          recentCrashCount: 0,
+          latestCrashSummary: undefined
+        }
+      }),
+      updateHealthMod: async () => true,
+      updateAllHealthMods: async () => ({ updated: 1, failed: 0 }),
+      disableHealthMod: async () => true,
+      deleteHealthMod: async () => true,
+      installHealthDependency: async () => true,
+      optimizeHealthRam: async () => true,
+
       onAchievementUnlocked: () => () => {},
       onAchievementStatsUpdated: () => () => {},
       onCloudSyncUpdated: () => () => {},

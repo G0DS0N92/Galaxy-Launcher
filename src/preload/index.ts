@@ -17,7 +17,8 @@ import type {
   ModLoader,
   UpdateStatus,
   GalaxyCosmetics,
-  InstanceShareData
+  InstanceShareData,
+  InstanceHealthReport
 } from './types';
 
 const galaxyApi = {
@@ -333,7 +334,23 @@ const galaxyApi = {
     return () => {
       ipcRenderer.removeListener('game:stopped', handler);
     };
-  }
+  },
+
+  // Instance Health & Diagnostics
+  checkInstanceHealth: (instanceId: string): Promise<InstanceHealthReport> =>
+    ipcRenderer.invoke('health:check', instanceId),
+  updateHealthMod: (instanceId: string, oldFileName: string, newDownloadUrl: string, newFileName: string, sha1?: string): Promise<boolean> =>
+    ipcRenderer.invoke('health:updateMod', instanceId, oldFileName, newDownloadUrl, newFileName, sha1),
+  updateAllHealthMods: (instanceId: string, updates: { oldFileName: string; downloadUrl: string; newFileName: string; sha1?: string }[]): Promise<{ updated: number; failed: number }> =>
+    ipcRenderer.invoke('health:updateAllMods', instanceId, updates),
+  disableHealthMod: (instanceId: string, fileName: string): Promise<boolean> =>
+    ipcRenderer.invoke('health:disableMod', instanceId, fileName),
+  deleteHealthMod: (instanceId: string, fileName: string): Promise<boolean> =>
+    ipcRenderer.invoke('health:deleteMod', instanceId, fileName),
+  installHealthDependency: (instanceId: string, dependencySlug: string): Promise<boolean> =>
+    ipcRenderer.invoke('health:installDependency', instanceId, dependencySlug),
+  optimizeHealthRam: (instanceId: string, recommendedMaxMb: number): Promise<boolean> =>
+    ipcRenderer.invoke('health:optimizeRam', instanceId, recommendedMaxMb)
 };
 
 contextBridge.exposeInMainWorld('galaxy', galaxyApi);
