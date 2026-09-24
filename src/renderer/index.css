@@ -2,7 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 
-:root, [data-theme="nebula-purple"], .theme-nebula-purple {
+:root, [data-theme="deep-void"], .theme-deep-void {
+  --theme-accent: #6366f1;
+  --theme-accent-hover: #4f46e5;
+  --theme-accent-glow: rgba(99, 102, 241, 0.45);
+  --theme-accent-subtle: rgba(99, 102, 241, 0.18);
+  --theme-secondary: #64748b;
+  --theme-secondary-glow: rgba(100, 116, 139, 0.35);
+  --theme-border: rgba(99, 102, 241, 0.35);
+  --theme-border-active: rgba(99, 102, 241, 0.6);
+  --theme-grad-from: #4f46e5;
+  --theme-grad-to: #334155;
+  --theme-bg-radial: radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.18) 0%, rgba(5, 6, 10, 0.99) 80%);
+}
+
+[data-theme="nebula-purple"], .theme-nebula-purple {
   --theme-accent: #a855f7;
   --theme-accent-hover: #9333ea;
   --theme-accent-glow: rgba(168, 85, 247, 0.45);
@@ -44,19 +58,6 @@
   --theme-bg-radial: radial-gradient(circle at 50% 0%, rgba(245, 158, 11, 0.22) 0%, rgba(7, 8, 14, 0.98) 75%);
 }
 
-[data-theme="deep-void"], .theme-deep-void {
-  --theme-accent: #6366f1;
-  --theme-accent-hover: #4f46e5;
-  --theme-accent-glow: rgba(99, 102, 241, 0.45);
-  --theme-accent-subtle: rgba(99, 102, 241, 0.18);
-  --theme-secondary: #64748b;
-  --theme-secondary-glow: rgba(100, 116, 139, 0.35);
-  --theme-border: rgba(99, 102, 241, 0.35);
-  --theme-border-active: rgba(99, 102, 241, 0.6);
-  --theme-grad-from: #4f46e5;
-  --theme-grad-to: #334155;
-  --theme-bg-radial: radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.18) 0%, rgba(5, 6, 10, 0.99) 80%);
-}
 
 [data-theme="emerald-aurora"], .theme-emerald-aurora {
   --theme-accent: #10b981;

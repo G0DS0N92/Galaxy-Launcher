@@ -12,6 +12,7 @@ export interface WorldBackup {
 export interface Instance {
   id: string;
   name: string;
+  description?: string;
   version: string;
   loader: ModLoader;
   loaderVersion?: string;
