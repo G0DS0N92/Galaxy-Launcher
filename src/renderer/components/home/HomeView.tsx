@@ -51,6 +51,7 @@ import {
   Copy,
   Stethoscope,
   Package,
+  Pin,
   MoreVertical,
   MoreHorizontal
 } from 'lucide-react';
@@ -62,6 +63,10 @@ import { ShareInstanceModal } from '../instances/ShareInstanceModal';
 import { CloneInstanceModal } from '../instances/CloneInstanceModal';
 import { InstanceHealthModal } from '../instances/InstanceHealthModal';
 import { TabType } from '../layout/Sidebar';
+import bgGalaxy from '../../assets/instance_backgrounds/bg_galaxy.jpg';
+import bgSunset from '../../assets/instance_backgrounds/bg_sunset.jpg';
+import bgNether from '../../assets/instance_backgrounds/bg_nether.jpg';
+import bgVanilla from '../../assets/instance_backgrounds/bg_vanilla.jpg';
 
 interface HomeViewProps {
   activeTab?: 'home' | 'instances';
@@ -307,6 +312,17 @@ export const HomeView: React.FC<HomeViewProps> = ({
       return { status: 'warning', label: 'Low RAM' };
     }
     return { status: 'healthy', label: 'Healthy' };
+  };
+
+  const getInstanceBackground = (inst: Instance, healthStatus: 'healthy' | 'warning' | 'critical') => {
+    if (healthStatus === 'critical') return bgNether;
+    if (healthStatus === 'warning') return bgSunset;
+    const nameLower = (inst.name || '').toLowerCase();
+    const loaderLower = (inst.loader || '').toLowerCase();
+    if (nameLower.includes('vanilla') || loaderLower === 'vanilla') return bgVanilla;
+    if (nameLower.includes('nether') || nameLower.includes('broken')) return bgNether;
+    if (nameLower.includes('sunset') || nameLower.includes('test')) return bgSunset;
+    return bgGalaxy;
   };
 
   const handleSaveIcon = async (icon: string, background: string) => {
@@ -611,116 +627,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
           </div>
         ) : (
           <>
-            {/* Playtime Statistics & Distribution Section */}
-            <div className="p-5 rounded-2xl bg-gradient-to-b from-galaxy-900/90 to-galaxy-950/90 border border-white/[0.08] backdrop-blur-xl shadow-xl space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center space-x-2.5">
-                  <div className="p-2 rounded-xl bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 shadow-glow-sm">
-                    <Clock className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h2 className="text-sm font-display font-bold text-white flex items-center space-x-2">
-                      <span>Playtime Statistics & Distribution</span>
-                      <span className="text-[10px] font-mono font-semibold text-cyan-300 bg-cyan-500/15 border border-cyan-500/30 px-2 py-0.5 rounded-full">
-                        {totalPlaytimeHours > 0 ? `${totalPlaytimeHours}h ${totalPlaytimeRemainingMins}m Total` : `${totalPlaytimeMinutes}m Total`}
-                      </span>
-                    </h2>
-                    <p className="text-[11px] text-slate-400">
-                      Track usage time across instances, game sessions, and launch frequencies.
-                    </p>
-                  </div>
-                </div>
-
-                {/* Quick Stat Pill Cards */}
-                <div className="flex items-center space-x-2">
-                  <div className="px-3 py-1.5 rounded-xl bg-galaxy-950/80 border border-white/[0.08] flex items-center space-x-2">
-                    <Activity className="w-3.5 h-3.5 text-purple-400" />
-                    <div className="text-right">
-                      <div className="text-[10px] text-slate-400">Total Launches</div>
-                      <div className="text-xs font-mono font-bold text-slate-200">{totalLaunches} sessions</div>
-                    </div>
-                  </div>
-                  <div className="px-3 py-1.5 rounded-xl bg-galaxy-950/80 border border-white/[0.08] flex items-center space-x-2">
-                    <Star className="w-3.5 h-3.5 text-amber-400" />
-                    <div className="text-right">
-                      <div className="text-[10px] text-slate-400">Top Instance</div>
-                      <div className="text-xs font-mono font-bold text-amber-300 truncate max-w-[110px]">
-                        {mostPlayedInstance ? mostPlayedInstance.name : 'None'}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Multi-Segmented Proportional Playtime Bar */}
-              <div className="space-y-2 pt-1">
-                <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
-                  <span className="flex items-center space-x-1.5">
-                    <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-                    <span>Instance Playtime Share</span>
-                  </span>
-                  <span>{instancesWithPlaytime.length} Active Profiles</span>
-                </div>
-
-                {totalPlaytimeMinutes > 0 ? (
-                  <div className="h-4 w-full rounded-full overflow-hidden flex bg-galaxy-950/90 border border-white/[0.1] p-0.5 shadow-inner gap-0.5">
-                    {instancesWithPlaytime.map((inst, idx) => {
-                      const instMins = inst.playTimeMinutes || 0;
-                      const pct = Math.max(Math.round((instMins / totalPlaytimeMinutes) * 100), 1);
-                      const gradient = segmentGradients[idx % segmentGradients.length];
-                      const hours = Math.floor(instMins / 60);
-                      const mins = instMins % 60;
-                      return (
-                        <div
-                          key={inst.id}
-                          style={{ width: `${pct}%` }}
-                          className={`h-full bg-gradient-to-r ${gradient} rounded-full transition-all duration-500 hover:opacity-90 cursor-pointer group/segment relative`}
-                          title={`${inst.name}: ${hours}h ${mins}m (${pct}%)`}
-                        >
-                          {/* Floating segment tooltip */}
-                          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 px-2.5 py-1 rounded-lg bg-galaxy-950/95 border border-white/[0.15] text-[10px] font-mono text-slate-200 whitespace-nowrap opacity-0 group-hover/segment:opacity-100 pointer-events-none transition-all shadow-xl z-30">
-                            {inst.name}: {hours}h {mins}m ({pct}%)
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="h-4 w-full rounded-full bg-galaxy-950/80 border border-white/[0.08] flex items-center justify-center text-[10px] font-mono text-slate-500">
-                    No playtime recorded yet • Launch an instance to start tracking
-                  </div>
-                )}
-
-                {/* Instance Legend / Breakdown Chips */}
-                {instancesWithPlaytime.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-2 pt-1.5">
-                    {instancesWithPlaytime.slice(0, 6).map((inst, idx) => {
-                      const instMins = inst.playTimeMinutes || 0;
-                      const pct = Math.max(Math.round((instMins / totalPlaytimeMinutes) * 100), 1);
-                      const dotColor = segmentDotColors[idx % segmentDotColors.length];
-                      const hours = Math.floor(instMins / 60);
-                      const mins = instMins % 60;
-                      return (
-                        <div
-                          key={inst.id}
-                          onClick={() => onSelectInstance(inst)}
-                          className="px-2.5 py-1 rounded-lg bg-galaxy-950/70 hover:bg-galaxy-900 border border-white/[0.06] hover:border-cyan-500/40 cursor-pointer flex items-center space-x-1.5 text-[11px] transition-all"
-                        >
-                          <span className={`w-2 h-2 rounded-full ${dotColor}`} />
-                          <span className="font-medium text-slate-200 truncate max-w-[120px]">{inst.name}</span>
-                          <span className="text-[10px] font-mono text-slate-400">
-                            {hours > 0 ? `${hours}h ${mins}m` : `${mins}m`} ({pct}%)
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-
             {/* Filter, Search & View Controls Bar */}
-            <div className="p-4 rounded-2xl bg-galaxy-900/70 border border-white/[0.08] backdrop-blur-md space-y-3.5 shadow-lg">
+            <div className="p-4 rounded-2xl bg-galaxy-900/80 border border-white/[0.08] backdrop-blur-md space-y-3.5 shadow-lg">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                 {/* Search Input */}
                 <div className="relative flex-1 max-w-md">
@@ -809,9 +717,11 @@ export const HomeView: React.FC<HomeViewProps> = ({
                         }`}
                       >
                         <span>{chip.label}</span>
-                        <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-md ${
-                          isActive ? 'bg-black/30 text-white' : 'bg-white/[0.06] text-slate-400'
-                        }`}>
+                        <span
+                          className={`text-[10px] font-mono px-1.5 py-0.2 rounded-md ${
+                            isActive ? 'bg-black/30 text-white' : 'bg-white/[0.06] text-slate-400'
+                          }`}
+                        >
                           {chip.count}
                         </span>
                       </button>
@@ -821,7 +731,10 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
                 {/* Instance Total & Filtered Counter */}
                 <div className="text-[11px] font-mono text-slate-400 bg-galaxy-950/70 px-3 py-1 rounded-xl border border-white/[0.06] flex items-center space-x-2">
-                  <span>Showing <strong className="text-white font-bold">{filteredAndSortedInstances.length}</strong> of <strong className="text-white font-bold">{instances.length}</strong> Profiles</span>
+                  <span>
+                    Showing <strong className="text-white font-bold">{filteredAndSortedInstances.length}</strong> of{' '}
+                    <strong className="text-white font-bold">{instances.length}</strong> Profiles
+                  </span>
                   {instances.filter((i) => i.isFavorite).length > 0 && (
                     <>
                       <span className="text-slate-600">•</span>
@@ -867,8 +780,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 </div>
               </div>
             ) : viewMode === 'grid' ? (
-              /* High-Fidelity Reference Design Grid View Mode */
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4.5">
+              /* Exact Reference Design Grid View Mode */
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
                 {filteredAndSortedInstances.map((inst) => {
                   const isSelected = selectedInstance?.id === inst.id;
                   const isInstRunning = inst.isRunning;
@@ -882,104 +795,121 @@ export const HomeView: React.FC<HomeViewProps> = ({
                         sounds.playClick();
                         onSelectInstance(inst);
                       }}
-                      className={`group relative rounded-3xl p-5 cursor-pointer transition-all duration-300 border flex flex-col justify-between overflow-hidden select-none ${
+                      className={`group relative rounded-3xl min-h-[225px] sm:min-h-[235px] cursor-pointer transition-all duration-300 flex flex-col justify-between overflow-hidden select-none ${
                         isSelected
-                          ? 'bg-gradient-to-r from-galaxy-950/95 via-galaxy-900/90 to-galaxy-950/95 border-indigo-500/80 ring-2 ring-indigo-500/60 shadow-[0_0_35px_rgba(99,102,241,0.35)]'
-                          : 'bg-galaxy-950/75 hover:bg-galaxy-900/85 border-white/[0.08] hover:border-indigo-400/50 hover:-translate-y-1 hover:shadow-[0_16px_36px_rgba(0,0,0,0.6),0_0_25px_rgba(99,102,241,0.2)]'
+                          ? 'border-2 border-cyan-400 shadow-[0_0_30px_rgba(34,211,238,0.4)] ring-1 ring-cyan-400/50'
+                          : health.status === 'critical'
+                            ? 'border border-rose-500/50 hover:border-rose-400/80 hover:shadow-[0_0_25px_rgba(244,63,94,0.3)] hover:-translate-y-1'
+                            : health.status === 'warning'
+                              ? 'border border-amber-500/50 hover:border-amber-400/80 hover:shadow-[0_0_25px_rgba(245,158,11,0.25)] hover:-translate-y-1'
+                              : 'border border-white/[0.12] hover:border-indigo-400/60 hover:shadow-[0_16px_36px_rgba(0,0,0,0.6),0_0_25px_rgba(99,102,241,0.3)] hover:-translate-y-1'
                       }`}
                     >
-                      {/* Atmospheric Panorama Background & Dynamic Glow */}
-                      <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-galaxy-950/60 to-black/70 pointer-events-none z-0" />
-                      
-                      {health.status === 'warning' && (
-                        <div className="absolute -top-12 left-1/4 right-1/4 h-24 bg-amber-500/10 blur-2xl pointer-events-none" />
-                      )}
-                      {health.status === 'critical' && (
-                        <div className="absolute -top-12 left-1/4 right-1/4 h-24 bg-rose-500/15 blur-2xl pointer-events-none" />
-                      )}
-                      {health.status === 'healthy' && (
-                        <div className="absolute -top-12 left-1/4 right-1/4 h-24 bg-indigo-500/10 blur-2xl pointer-events-none opacity-60 group-hover:opacity-100 transition-opacity" />
-                      )}
+                      {/* Atmospheric Panorama Background with Glowing Moon & World Artwork */}
+                      <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
+                        <img
+                          src={getInstanceBackground(inst, health.status)}
+                          alt={inst.name}
+                          className="w-full h-full object-cover object-right filter brightness-[0.88] contrast-[1.05] transition-transform duration-700 ease-out group-hover:scale-105"
+                        />
+                        {/* Gradient overlays to ensure 100% text readability on the left */}
+                        <div className="absolute inset-0 bg-gradient-to-r from-[#070b14] via-[#070b14]/85 via-45% to-transparent" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#070b14]/90 via-transparent to-black/20" />
+
+                        {/* Dynamic atmospheric top glow */}
+                        {health.status === 'warning' && (
+                          <div className="absolute -top-16 left-1/4 right-1/4 h-32 bg-amber-500/15 blur-3xl pointer-events-none" />
+                        )}
+                        {health.status === 'critical' && (
+                          <div className="absolute -top-16 left-1/4 right-1/4 h-32 bg-rose-500/20 blur-3xl pointer-events-none" />
+                        )}
+                        {health.status === 'healthy' && (
+                          <div className="absolute -top-16 left-1/4 right-1/4 h-32 bg-indigo-500/10 blur-3xl pointer-events-none opacity-60 group-hover:opacity-100 transition-opacity" />
+                        )}
+                      </div>
 
                       {/* Card Content Relative Container */}
-                      <div className="relative z-10 flex flex-col justify-between h-full space-y-4">
-                        
-                        {/* Top Row: Icon + Title/Description/Chips + Top-Right Star/Pin */}
+                      <div className="relative z-10 p-5 sm:p-6 flex flex-col justify-between h-full space-y-4">
+                        {/* Top Row: Icon + Meta Info + Top-Right Actions */}
                         <div className="flex items-start justify-between gap-4">
-                          
-                          {/* Left: 3D Block / World Thumbnail + Info */}
+                          {/* Left: 3D Block / World Thumbnail + Meta Information */}
                           <div className="flex items-start space-x-4 min-w-0 flex-1">
-                            
-                            {/* 3D Icon / World Thumbnail */}
+                            {/* 3D Icon / World Thumbnail (Element 1) */}
                             <div
                               onClick={(e) => {
                                 e.stopPropagation();
                                 sounds.playClick();
                                 setEditingIconInstance(inst);
                               }}
-                              className="group/icon relative w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-black/50 border border-white/10 flex items-center justify-center shrink-0 shadow-lg overflow-hidden group-hover/icon:border-indigo-400/50 transition-all cursor-pointer"
+                              className="group/icon relative w-20 h-20 sm:w-24 sm:h-24 md:w-26 md:h-26 rounded-2xl bg-black/70 border border-white/20 flex items-center justify-center shrink-0 shadow-2xl overflow-hidden group-hover/icon:border-indigo-400/70 transition-all cursor-pointer"
                               title="Click to customize 3D icon & theme"
                             >
                               <InstanceIconRenderer
                                 icon={inst.icon || 'grass_block'}
                                 background={inst.iconBackground || 'obsidian'}
-                                size="md"
-                                className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl group-hover/icon:scale-110 transition-transform duration-300"
+                                size="lg"
+                                className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl group-hover/icon:scale-110 transition-transform duration-300"
                               />
-                              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/icon:opacity-100 flex items-center justify-center transition-opacity">
-                                <Palette className="w-4 h-4 text-cyan-300" />
+                              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/icon:opacity-100 flex items-center justify-center transition-opacity rounded-2xl">
+                                <Palette className="w-5 h-5 text-cyan-300" />
                               </div>
                             </div>
 
                             {/* Text Block: Title + Description + Chips */}
-                            <div className="space-y-2 min-w-0 flex-1">
-                              {/* Header Row: Favorite badge (if favorited) + Instance Title */}
-                              <div>
-                                <div className="flex items-center space-x-2">
-                                  {inst.isFavorite && (
-                                    <span className="px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 text-[10px] font-mono font-bold tracking-wider uppercase inline-flex items-center space-x-1 shadow-glow-sm shrink-0">
-                                      <Star className="w-3 h-3 fill-amber-300" />
-                                      <span>FAVORITE</span>
-                                    </span>
-                                  )}
-                                  {isInstRunning && (
-                                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-mono font-bold animate-pulse shrink-0">
-                                      RUNNING
-                                    </span>
-                                  )}
-                                </div>
-
-                                <h3 className="text-base sm:text-lg font-display font-bold text-white tracking-wide truncate group-hover:text-indigo-200 transition-colors mt-0.5" title={inst.name}>
-                                  {inst.name || 'Untitled Instance'}
-                                </h3>
-
-                                <p className="text-xs text-slate-400 truncate mt-0.5">
-                                  {inst.description || (inst.loader !== 'vanilla' ? `${inst.loader.toUpperCase()} modded instance • ${inst.memoryMax ?? 4096} MB RAM` : `Vanilla Minecraft profile • ${inst.memoryMax ?? 4096} MB RAM`)}
-                                </p>
+                            <div className="space-y-1.5 min-w-0 flex-1">
+                              {/* Header Badges: Favorite badge + Running */}
+                              <div className="flex items-center space-x-2">
+                                {inst.isFavorite && (
+                                  <span className="px-3 py-0.5 rounded-full bg-[#3d2c07]/90 text-amber-300 border border-amber-500/50 text-[10.5px] font-bold tracking-wider uppercase inline-flex items-center space-x-1.5 shadow-[0_0_12px_rgba(245,158,11,0.35)] shrink-0">
+                                    <Star className="w-3.5 h-3.5 fill-amber-300 text-amber-300" />
+                                    <span>FAVORITE</span>
+                                  </span>
+                                )}
+                                {isInstRunning && (
+                                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10.5px] font-bold tracking-wider uppercase animate-pulse shrink-0">
+                                    RUNNING
+                                  </span>
+                                )}
                               </div>
 
-                              {/* Info Tags / Chips Row */}
-                              <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                              {/* Title (Element 3) */}
+                              <h3
+                                className="text-lg sm:text-xl md:text-2xl font-display font-bold text-white tracking-tight leading-tight truncate group-hover:text-indigo-200 transition-colors"
+                                title={inst.name}
+                              >
+                                {inst.name || 'Untitled Instance'}
+                              </h3>
+
+                              {/* Description (Element 4) */}
+                              <p className="text-xs sm:text-sm text-slate-300/80 truncate leading-normal">
+                                {inst.description ||
+                                  (inst.loader !== 'vanilla'
+                                    ? `${inst.loader.toUpperCase()} modded instance • ${inst.memoryMax ?? 4096} MB RAM`
+                                    : `Vanilla Minecraft profile • ${inst.memoryMax ?? 4096} MB RAM`)}
+                              </p>
+
+                              {/* Info Tags / Chips (Element 5) */}
+                              <div className="flex flex-wrap items-center gap-2 pt-1">
                                 {/* Minecraft Version Chip */}
-                                <span className="px-2.5 py-1 rounded-xl bg-white/[0.05] border border-white/[0.08] text-slate-200 text-xs font-mono flex items-center space-x-1.5 shadow-sm">
-                                  <span className="w-3.5 h-3.5 rounded bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-[9px] font-bold">🟩</span>
+                                <span className="px-2.5 py-1 rounded-lg bg-[#0e1422]/90 border border-white/10 text-slate-200 text-xs font-mono font-medium flex items-center space-x-1.5 shadow-sm">
+                                  <span className="text-emerald-400 text-[10px]">🟩</span>
                                   <span>Minecraft {inst.version || '1.21.1'}</span>
                                 </span>
 
-                                {/* Loader Chip */}
-                                <span className="px-2.5 py-1 rounded-xl bg-white/[0.05] border border-white/[0.08] text-slate-200 text-xs font-mono flex items-center space-x-1.5 capitalize shadow-sm">
+                                {/* Mod Loader Chip */}
+                                <span className="px-2.5 py-1 rounded-lg bg-[#0e1422]/90 border border-white/10 text-slate-200 text-xs font-mono font-medium capitalize flex items-center space-x-1.5 shadow-sm">
                                   <Layers className="w-3.5 h-3.5 text-cyan-400" />
                                   <span>{inst.loader || 'Fabric'}</span>
                                 </span>
 
                                 {/* Mods Count Chip */}
                                 {modCount > 0 ? (
-                                  <span className="px-2.5 py-1 rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-300 text-xs font-mono flex items-center space-x-1.5 shadow-sm">
+                                  <span className="px-2.5 py-1 rounded-lg bg-[#0e1422]/90 border border-white/10 text-slate-200 text-xs font-mono font-medium flex items-center space-x-1.5 shadow-sm">
                                     <Package className="w-3.5 h-3.5 text-purple-400" />
                                     <span>{modCount} Mods</span>
                                   </span>
                                 ) : (
-                                  <span className="px-2.5 py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-300/90 text-xs font-mono flex items-center space-x-1.5 shadow-sm">
+                                  <span className="px-2.5 py-1 rounded-lg bg-[#0e1422]/90 border border-white/10 text-slate-200 text-xs font-mono font-medium flex items-center space-x-1.5 shadow-sm">
                                     <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
                                     <span>Vanilla</span>
                                   </span>
@@ -988,8 +918,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
                             </div>
                           </div>
 
-                          {/* Top Right: Star Toggle */}
-                          <div className="flex items-center space-x-1 p-1 rounded-2xl bg-white/[0.04] border border-white/[0.08] shrink-0">
+                          {/* Top-Right Quick Actions: Star & Pin */}
+                          <div className="flex items-center space-x-1 p-1 rounded-xl bg-[#0b101c]/80 border border-white/10 shrink-0 backdrop-blur-md">
                             <button
                               onClick={async (e) => {
                                 e.stopPropagation();
@@ -1004,7 +934,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                                   message: `${inst.name} is now ${updated.isFavorite ? 'pinned to top' : 'unstarred'}.`
                                 });
                               }}
-                              className={`p-1.5 rounded-xl transition-all ${
+                              className={`p-1.5 rounded-lg transition-all ${
                                 inst.isFavorite
                                   ? 'text-amber-300 bg-amber-500/20 shadow-glow-sm'
                                   : 'text-slate-400 hover:text-amber-300 hover:bg-white/[0.08]'
@@ -1013,51 +943,75 @@ export const HomeView: React.FC<HomeViewProps> = ({
                             >
                               <Star className={`w-4 h-4 ${inst.isFavorite ? 'fill-current' : ''}`} />
                             </button>
+
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                sounds.playClick();
+                                const updated = { ...inst, isPinned: !inst.isPinned, isFavorite: !inst.isPinned ? true : inst.isFavorite };
+                                if (onUpdateInstance) await onUpdateInstance(updated);
+                                onShowToast?.({
+                                  id: Math.random().toString(),
+                                  type: 'info',
+                                  title: updated.isPinned ? 'Pinned to Top' : 'Unpinned',
+                                  message: `${inst.name} is ${updated.isPinned ? 'pinned' : 'unpinned'}.`
+                                });
+                              }}
+                              className={`p-1.5 rounded-lg transition-all ${
+                                inst.isPinned
+                                  ? 'text-indigo-300 bg-indigo-500/20 shadow-glow-sm'
+                                  : 'text-slate-400 hover:text-indigo-300 hover:bg-white/[0.08]'
+                              }`}
+                              title={inst.isPinned ? 'Unpin Instance' : 'Pin Instance'}
+                            >
+                              <Pin className={`w-4 h-4 ${inst.isPinned ? 'fill-current' : ''}`} />
+                            </button>
                           </div>
                         </div>
 
                         {/* Bottom Bar: Health Status + Last Played (Left) & Play Button + 3-Dots Menu (Right) */}
-                        <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-white/[0.06]">
-                          
+                        <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-white/[0.08]">
                           {/* Left: Health Indicator + Last Played */}
                           <div className="flex items-center space-x-3">
-                            {/* Health Status Button */}
+                            {/* Health Status Button (Element 6) */}
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 sounds.playClick();
                                 setHealthCheckingInstance(inst);
                               }}
-                              className={`px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center space-x-2 transition-all hover:scale-105 active:scale-95 shadow-sm ${
+                              className={`px-3.5 py-1.5 rounded-full border text-xs font-semibold flex items-center space-x-2 transition-all hover:scale-105 active:scale-95 shadow-sm ${
                                 health.status === 'critical'
-                                  ? 'bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border-rose-500/30'
+                                  ? 'bg-rose-950/70 hover:bg-rose-900/80 text-rose-300 border-rose-500/40 shadow-[0_0_12px_rgba(244,63,94,0.25)]'
                                   : health.status === 'warning'
-                                    ? 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border-amber-500/30'
-                                    : 'bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border-emerald-500/30'
+                                    ? 'bg-amber-950/70 hover:bg-amber-900/80 text-amber-300 border-amber-500/40 shadow-[0_0_12px_rgba(245,158,11,0.25)]'
+                                    : 'bg-emerald-950/70 hover:bg-emerald-900/80 text-emerald-300 border-emerald-500/40 shadow-[0_0_12px_rgba(16,185,129,0.25)]'
                               }`}
                               title="Click to run health checkup"
                             >
-                              <span className={`w-2 h-2 rounded-full ${
-                                health.status === 'critical'
-                                  ? 'bg-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.8)]'
-                                  : health.status === 'warning'
-                                    ? 'bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.8)]'
-                                    : 'bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]'
-                              }`} />
+                              <span
+                                className={`w-2.5 h-2.5 rounded-full ${
+                                  health.status === 'critical'
+                                    ? 'bg-rose-400 shadow-[0_0_8px_#f87171]'
+                                    : health.status === 'warning'
+                                      ? 'bg-amber-400 shadow-[0_0_8px_#fbbf24]'
+                                      : 'bg-emerald-400 shadow-[0_0_8px_#34d399]'
+                                }`}
+                              />
                               <span>{health.label}</span>
-                              <ChevronRight className="w-3.5 h-3.5 opacity-60" />
+                              <ChevronRight className="w-3.5 h-3.5 opacity-70" />
                             </button>
 
-                            {/* Last Played */}
-                            <div className="flex items-center space-x-1.5 text-xs text-slate-400 font-mono">
-                              <Clock className="w-3.5 h-3.5 text-slate-500" />
+                            {/* Last Played (Element 7) */}
+                            <div className="flex items-center space-x-1.5 text-xs text-slate-300/80 font-normal">
+                              <Clock className="w-3.5 h-3.5 text-slate-400" />
                               <span>Last played {formatTimeAgo(inst.lastPlayed || inst.createdAt)}</span>
                             </div>
                           </div>
 
                           {/* Right: Play Button + More Options (···) */}
                           <div className="flex items-center space-x-2">
-                            {/* Play Button */}
+                            {/* Play / Stop Button (Element 8) */}
                             {isInstRunning ? (
                               <button
                                 onClick={(e) => {
@@ -1065,10 +1019,18 @@ export const HomeView: React.FC<HomeViewProps> = ({
                                   sounds.playError();
                                   onKill(inst);
                                 }}
-                                className="px-6 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-display font-bold text-xs shadow-glow-sm flex items-center space-x-2 transition-all hover:scale-105 active:scale-95"
+                                className="px-7 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white font-bold text-sm shadow-[0_0_20px_rgba(244,63,94,0.5)] flex items-center space-x-2 transition-all hover:scale-105 active:scale-95"
                               >
                                 <Square className="w-3.5 h-3.5 fill-current" />
                                 <span>Stop</span>
+                              </button>
+                            ) : isLaunching ? (
+                              <button
+                                disabled
+                                className="px-7 py-2.5 rounded-xl bg-gradient-to-r from-indigo-700 to-purple-800 text-white font-bold text-sm shadow-lg flex items-center space-x-2 cursor-wait"
+                              >
+                                <Loader2 className="w-4 h-4 animate-spin text-white" />
+                                <span>Launching...</span>
                               </button>
                             ) : (
                               <button
@@ -1077,14 +1039,14 @@ export const HomeView: React.FC<HomeViewProps> = ({
                                   sounds.playLaunch();
                                   onLaunch(inst);
                                 }}
-                                className="px-7 py-2 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-display font-extrabold text-xs flex items-center space-x-2 transition-all shadow-[0_0_20px_rgba(99,102,241,0.45)] hover:shadow-[0_0_28px_rgba(99,102,241,0.65)] hover:scale-105 active:scale-95"
+                                className="px-8 py-2.5 rounded-xl bg-gradient-to-r from-[#3b82f6] to-[#8b5cf6] hover:from-[#2563eb] hover:to-[#7c3aed] text-white font-bold text-sm flex items-center space-x-2 transition-all shadow-[0_0_24px_rgba(59,130,246,0.6)] hover:shadow-[0_0_32px_rgba(139,92,246,0.8)] hover:scale-105 active:scale-95"
                               >
-                                <Play className="w-3.5 h-3.5 fill-current" />
+                                <Play className="w-4 h-4 fill-white text-white" />
                                 <span>Play</span>
                               </button>
                             )}
 
-                            {/* 3-Dots Dropdown Trigger */}
+                            {/* 3-Dots Dropdown Trigger (Element 9) */}
                             <div className="relative">
                               <button
                                 onClick={(e) => {
@@ -1092,10 +1054,10 @@ export const HomeView: React.FC<HomeViewProps> = ({
                                   sounds.playClick();
                                   setActiveMenuInstanceId(activeMenuInstanceId === inst.id ? null : inst.id);
                                 }}
-                                className={`p-2 rounded-xl border transition-all ${
+                                className={`p-2.5 rounded-xl border transition-all ${
                                   activeMenuInstanceId === inst.id
                                     ? 'bg-indigo-600 text-white border-indigo-400 shadow-glow-sm'
-                                    : 'bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 border-white/[0.08]'
+                                    : 'bg-[#0e1422]/90 hover:bg-[#162035] text-slate-300 hover:text-white border-white/10'
                                 }`}
                                 title="More Options"
                               >
@@ -1219,14 +1181,24 @@ export const HomeView: React.FC<HomeViewProps> = ({
                         sounds.playClick();
                         onSelectInstance(inst);
                       }}
-                      className={`p-4 rounded-2xl cursor-pointer transition-all border flex items-center justify-between space-x-4 ${
+                      className={`relative rounded-2xl p-4 cursor-pointer transition-all border flex items-center justify-between space-x-4 overflow-hidden ${
                         isSelected
-                          ? 'bg-gradient-to-r from-indigo-950/40 via-galaxy-900/90 to-galaxy-950/95 border-indigo-400/80 shadow-[0_0_25px_rgba(99,102,241,0.25)] ring-1 ring-indigo-400/30'
-                          : 'bg-galaxy-950/70 hover:bg-galaxy-900/85 border-white/[0.08] hover:border-indigo-400/40 hover:shadow-lg'
+                          ? 'border-2 border-cyan-400 shadow-[0_0_25px_rgba(34,211,238,0.35)] ring-1 ring-cyan-400/40 bg-galaxy-950/90'
+                          : 'bg-galaxy-950/75 hover:bg-galaxy-900/90 border-white/[0.08] hover:border-indigo-400/50 hover:shadow-lg'
                       }`}
                     >
+                      {/* Subtle Panorama Glow on the Right */}
+                      <div className="absolute right-0 top-0 bottom-0 w-1/3 pointer-events-none opacity-20 overflow-hidden">
+                        <img
+                          src={getInstanceBackground(inst, health.status)}
+                          alt=""
+                          className="w-full h-full object-cover object-right"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-r from-galaxy-950 via-galaxy-950/60 to-transparent" />
+                      </div>
+
                       {/* Left: Icon + Meta + Badges */}
-                      <div className="flex items-center space-x-4 min-w-0">
+                      <div className="relative z-10 flex items-center space-x-4 min-w-0">
                         <div
                           onClick={(e) => {
                             e.stopPropagation();
@@ -1240,7 +1212,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                             icon={inst.icon || 'grass_block'}
                             background={inst.iconBackground || 'obsidian'}
                             size="md"
-                            className="w-13 h-13 rounded-xl group-hover/icon:scale-105 transition-transform shadow-md"
+                            className="w-14 h-14 rounded-xl group-hover/icon:scale-105 transition-transform shadow-md"
                           />
                           <div className="absolute inset-0 bg-black/60 rounded-xl opacity-0 group-hover/icon:opacity-100 flex items-center justify-center text-white transition-opacity">
                             <Palette className="w-3.5 h-3.5 text-cyan-300" />
@@ -1250,12 +1222,12 @@ export const HomeView: React.FC<HomeViewProps> = ({
                         <div className="space-y-1.5 min-w-0">
                           <div className="flex items-center space-x-2">
                             {inst.isFavorite && (
-                              <span className="px-2 py-0.2 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 text-[9px] font-mono font-bold tracking-wider uppercase inline-flex items-center space-x-1 shadow-glow-sm">
+                              <span className="px-2.5 py-0.5 rounded-full bg-[#3d2c07]/90 text-amber-300 border border-amber-500/50 text-[9px] font-mono font-bold tracking-wider uppercase inline-flex items-center space-x-1 shadow-glow-sm">
                                 <Star className="w-2.5 h-2.5 fill-amber-300" />
                                 <span>FAVORITE</span>
                               </span>
                             )}
-                            <span className="font-display font-bold text-sm text-slate-100 truncate">
+                            <span className="font-display font-bold text-sm sm:text-base text-slate-100 truncate">
                               {inst.name || 'Untitled Instance'}
                             </span>
                             {isInstRunning && (
@@ -1267,9 +1239,9 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
                           {/* Meta Chips Row */}
                           <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono text-slate-400">
-                            <span className="px-2 py-0.5 rounded-lg bg-white/[0.05] border border-white/[0.08] text-slate-300 flex items-center space-x-1">
+                            <span className="px-2 py-0.5 rounded-lg bg-[#0e1422]/90 border border-white/10 text-slate-200 flex items-center space-x-1">
                               <span>🟩</span>
-                              <span>MC {inst.version || '1.21.1'}</span>
+                              <span>Minecraft {inst.version || '1.21.1'}</span>
                             </span>
                             <span className={`px-2 py-0.5 rounded-lg border ${getLoaderColor(inst.loader)} uppercase font-semibold text-[10px]`}>
                               {inst.loader || 'vanilla'}
@@ -1293,7 +1265,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                       </div>
 
                       {/* Right: Health + Star + Play + 3-Dots */}
-                      <div className="flex items-center space-x-2.5 flex-shrink-0">
+                      <div className="relative z-10 flex items-center space-x-2.5 flex-shrink-0">
                         {/* Health Status Pill */}
                         <button
                           onClick={(e) => {
@@ -1301,22 +1273,24 @@ export const HomeView: React.FC<HomeViewProps> = ({
                             sounds.playClick();
                             setHealthCheckingInstance(inst);
                           }}
-                          className={`px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center space-x-1.5 transition-all hover:scale-105 active:scale-95 ${
+                          className={`px-3 py-1.5 rounded-full border text-xs font-semibold flex items-center space-x-1.5 transition-all hover:scale-105 active:scale-95 shadow-sm ${
                             health.status === 'critical'
-                              ? 'bg-rose-500/15 text-rose-300 border-rose-500/30'
+                              ? 'bg-rose-950/70 text-rose-300 border-rose-500/40'
                               : health.status === 'warning'
-                                ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
-                                : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                                ? 'bg-amber-950/70 text-amber-300 border-amber-500/40'
+                                : 'bg-emerald-950/70 text-emerald-300 border-emerald-500/40'
                           }`}
                           title="Run Health Checkup"
                         >
-                          <span className={`w-2 h-2 rounded-full ${
-                            health.status === 'critical'
-                              ? 'bg-rose-400'
-                              : health.status === 'warning'
-                                ? 'bg-amber-400'
-                                : 'bg-emerald-400'
-                          }`} />
+                          <span
+                            className={`w-2 h-2 rounded-full ${
+                              health.status === 'critical'
+                                ? 'bg-rose-400'
+                                : health.status === 'warning'
+                                  ? 'bg-amber-400'
+                                  : 'bg-emerald-400'
+                            }`}
+                          />
                           <span>{health.label}</span>
                           <ChevronRight className="w-3 h-3 opacity-60" />
                         </button>
@@ -1354,10 +1328,18 @@ export const HomeView: React.FC<HomeViewProps> = ({
                               sounds.playError();
                               onKill(inst);
                             }}
-                            className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-glow-sm flex items-center space-x-1.5"
+                            className="px-5 py-2 rounded-xl bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 text-white font-bold text-xs shadow-[0_0_15px_rgba(244,63,94,0.4)] flex items-center space-x-1.5"
                           >
                             <Square className="w-3.5 h-3.5 fill-current" />
                             <span>Stop</span>
+                          </button>
+                        ) : isLaunching ? (
+                          <button
+                            disabled
+                            className="px-5 py-2 rounded-xl bg-indigo-700 text-white font-bold text-xs flex items-center space-x-1.5 cursor-wait"
+                          >
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
+                            <span>Launching...</span>
                           </button>
                         ) : (
                           <button
@@ -1366,7 +1348,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                               sounds.playLaunch();
                               onLaunch(inst);
                             }}
-                            className="px-5 py-2 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold text-xs flex items-center space-x-1.5 transition-all transform hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(99,102,241,0.4)]"
+                            className="px-6 py-2 rounded-xl bg-gradient-to-r from-[#3b82f6] to-[#8b5cf6] hover:from-[#2563eb] hover:to-[#7c3aed] text-white font-bold text-xs flex items-center space-x-1.5 transition-all transform hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(59,130,246,0.5)]"
                           >
                             <Play className="w-3.5 h-3.5 fill-current" />
                             <span>Play</span>

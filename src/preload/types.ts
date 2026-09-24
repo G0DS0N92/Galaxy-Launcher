@@ -28,6 +28,7 @@ export interface Instance {
   playTimeMinutes: number;
   launchCount?: number;
   isFavorite?: boolean;
+  isPinned?: boolean;
   resolution: {
     width: number;
     height: number;
