@@ -683,6 +683,21 @@ export const App: React.FC = () => {
               activeAccount={activeAccount}
               onLaunchInstance={handleLaunch}
               onShowToast={addToast}
+              initialTab="friends"
+              onInstanceRestored={async (inst) => {
+                const list = await window.galaxy.listInstances();
+                setInstances(list);
+                setSelectedInstance(inst);
+                setActiveTab('instances');
+              }}
+            />
+          ) : activeTab === 'cloud' ? (
+            <SocialView
+              instances={instances}
+              activeAccount={activeAccount}
+              onLaunchInstance={handleLaunch}
+              onShowToast={addToast}
+              initialTab="cloud"
               onInstanceRestored={async (inst) => {
                 const list = await window.galaxy.listInstances();
                 setInstances(list);
