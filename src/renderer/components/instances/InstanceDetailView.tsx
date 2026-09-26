@@ -1922,13 +1922,13 @@ export const InstanceDetailView: React.FC<InstanceDetailViewProps> = ({
   const currentBannerConfig = TAB_BANNER_CONFIG[activeTab] || TAB_BANNER_CONFIG.content;
 
   return (
-    <div className="w-full h-full flex flex-col select-none p-4 sm:p-5 lg:p-5 gap-3 sm:gap-3.5 font-sans overflow-hidden">
+    <div className="w-full min-h-full flex flex-col select-none p-4 sm:p-5 lg:p-5 gap-3 sm:gap-3.5 font-sans pb-10">
       {/* ========================================================================= */}
       {/* HERO BANNER CARD — Unified panoramic banner with dedicated subpage artwork */}
       {/* ========================================================================= */}
-      <div className="w-full relative rounded-3xl overflow-hidden border border-white/[0.1] shadow-2xl h-[200px] sm:h-[215px] lg:h-[225px] xl:h-[235px] group shrink-0 z-20">
-        {/* Background Minecraft Subpage Art */}
-        <div className="absolute inset-0 pointer-events-none">
+      <div className="w-full relative rounded-3xl border border-white/[0.1] shadow-2xl h-[200px] sm:h-[215px] lg:h-[225px] xl:h-[235px] group shrink-0 z-30">
+        {/* Background Minecraft Subpage Art — Clipped to rounded card corners */}
+        <div className="absolute inset-0 rounded-3xl overflow-hidden pointer-events-none">
           <img
             src={currentBannerConfig.bg}
             alt={currentBannerConfig.label}
@@ -2068,7 +2068,7 @@ export const InstanceDetailView: React.FC<InstanceDetailViewProps> = ({
                 {showHeaderMoreMenu && (
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setShowHeaderMoreMenu(false)} />
-                    <div className="absolute left-0 sm:right-0 sm:left-auto mt-2 w-56 rounded-2xl bg-[#0b102c]/95 border border-[#233374] shadow-[0_12px_40px_rgba(0,0,0,0.85)] py-2 z-50 animate-in fade-in zoom-in-95 duration-150 backdrop-blur-2xl">
+                    <div className="absolute left-0 top-full mt-2 w-56 rounded-2xl bg-[#0b102c]/98 border border-[#233374] shadow-[0_16px_50px_rgba(0,0,0,0.95)] py-2 z-50 animate-in fade-in zoom-in-95 duration-150 backdrop-blur-2xl">
                       <button onClick={() => { setShowHeaderMoreMenu(false); sounds.playClick(); setShowHealthModal(true); }} className="w-full px-3.5 py-2 text-left text-xs text-slate-200 hover:bg-white/[0.06] flex items-center space-x-2.5 cursor-pointer">
                         <Stethoscope className="w-4 h-4 text-emerald-400" /><span>Run Health Checkup</span>
                       </button>
