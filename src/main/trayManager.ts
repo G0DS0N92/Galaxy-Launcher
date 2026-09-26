@@ -37,30 +37,28 @@ export class TrayManager {
     this.onCheckUpdatesCallback = cb;
   }
 
+  public hasValidTray(): boolean {
+    return this.tray !== null && !this.tray.isDestroyed();
+  }
+
   private createTray(): void {
     if (this.tray) return;
 
-    // Resolve icon path across possible production/dev runtime locations
+    // Prioritize clean PNG icons that decode reliably to 16x16 / 32x32 native tray icons on Windows
     const candidatePaths = [
-      path.join(process.resourcesPath, 'app.asar.unpacked', 'build', 'icon.ico'),
-      path.join(process.resourcesPath, 'app.asar.unpacked', 'public', 'favicon.ico'),
-      path.join(process.resourcesPath, 'app.asar.unpacked', 'build', 'icon.png'),
       path.join(process.resourcesPath, 'app.asar.unpacked', 'public', 'icon.png'),
-      path.join(app.getAppPath(), '..', 'app.asar.unpacked', 'build', 'icon.ico'),
-      path.join(app.getAppPath(), 'build', 'icon.ico'),
-      path.join(app.getAppPath(), 'public', 'favicon.ico'),
-      path.join(app.getAppPath(), 'build', 'icon.png'),
+      path.join(process.resourcesPath, 'app.asar.unpacked', 'build', 'icon.png'),
       path.join(app.getAppPath(), 'public', 'icon.png'),
-      path.join(process.resourcesPath, 'build', 'icon.ico'),
-      path.join(process.resourcesPath, 'public', 'favicon.ico'),
-      path.join(process.cwd(), 'build', 'icon.ico'),
-      path.join(process.cwd(), 'public', 'favicon.ico'),
-      path.join(process.cwd(), 'build', 'icon.png'),
+      path.join(app.getAppPath(), 'build', 'icon.png'),
       path.join(process.cwd(), 'public', 'icon.png'),
-      path.join(__dirname, '../../build/icon.ico'),
-      path.join(__dirname, '../../public/favicon.ico'),
+      path.join(process.cwd(), 'build', 'icon.png'),
+      path.join(__dirname, '../../public/icon.png'),
       path.join(__dirname, '../../build/icon.png'),
-      path.join(__dirname, '../../public/icon.png')
+      path.join(process.resourcesPath, 'app.asar.unpacked', 'public', 'favicon.ico'),
+      path.join(process.resourcesPath, 'app.asar.unpacked', 'build', 'icon.ico'),
+      path.join(app.getAppPath(), 'public', 'favicon.ico'),
+      path.join(app.getAppPath(), 'build', 'icon.ico'),
+      path.join(process.cwd(), 'build', 'icon.ico')
     ];
 
     let iconPath: string | null = null;
@@ -72,36 +70,30 @@ export class TrayManager {
     }
 
     try {
-      let finalTrayPath: string | null = null;
-      let finalNativeImage: nativeImage | null = null;
+      let trayImg: nativeImage | null = null;
 
       if (iconPath) {
         try {
-          const ext = path.extname(iconPath) || '.ico';
-          const physicalExtractPath = path.join(app.getPath('userData'), `galaxy_tray${ext}`);
-          const iconBuffer = fs.readFileSync(iconPath);
-          fs.writeFileSync(physicalExtractPath, iconBuffer);
-          finalTrayPath = physicalExtractPath;
-        } catch {
-          finalTrayPath = iconPath;
+          const loaded = nativeImage.createFromPath(iconPath);
+          if (!loaded.isEmpty()) {
+            trayImg = loaded.resize({ width: 16, height: 16 });
+          }
+        } catch (err) {
+          console.warn('[TrayManager] Failed reading icon from path:', err);
         }
       }
 
-      if (finalTrayPath && fs.existsSync(finalTrayPath)) {
+      if (!trayImg || trayImg.isEmpty()) {
         try {
-          if (finalTrayPath.endsWith('.ico')) {
-            this.tray = new Tray(finalTrayPath);
-          } else {
-            const img = nativeImage.createFromPath(finalTrayPath);
-            this.tray = new Tray(img.resize({ width: 16, height: 16 }));
-          }
-        } catch {
-          const img = nativeImage.createFromPath(finalTrayPath);
-          this.tray = new Tray(img.resize({ width: 16, height: 16 }));
+          const fallback = nativeImage.createFromDataURL(EMBEDDED_TRAY_ICON_PNG);
+          trayImg = fallback.resize({ width: 16, height: 16 });
+        } catch (err) {
+          console.warn('[TrayManager] Fallback data URL notice:', err);
         }
-      } else {
-        const trayIcon = nativeImage.createFromDataURL(EMBEDDED_TRAY_ICON_PNG);
-        this.tray = new Tray(trayIcon.resize({ width: 16, height: 16 }));
+      }
+
+      if (trayImg && !trayImg.isEmpty()) {
+        this.tray = new Tray(trayImg);
       }
 
       if (this.tray) {
@@ -141,6 +133,15 @@ export class TrayManager {
             this.hideWindow();
           } else {
             this.showWindow();
+          }
+        }
+      },
+      {
+        label: '⚡ Reload Launcher (F5)',
+        click: () => {
+          this.showWindow();
+          if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+            this.mainWindow.webContents.reload();
           }
         }
       },

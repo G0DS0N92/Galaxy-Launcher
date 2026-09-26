@@ -153,7 +153,7 @@ export const SocialView: React.FC<SocialViewProps> = ({
     return (
       <div className="min-h-full p-6 space-y-6 select-none max-w-[1600px] mx-auto">
         {/* 1. HERO HEADER BANNER */}
-        <div className="relative rounded-3xl overflow-hidden border border-white/[0.1] shadow-2xl h-56 md:h-64 group">
+        <div className="w-full relative rounded-3xl overflow-hidden border border-white/[0.1] shadow-2xl h-[200px] sm:h-[215px] lg:h-[225px] xl:h-[235px] group shrink-0">
           <img
             src={bgCloudSync}
             alt="Galaxy Cloud Banner"
@@ -551,7 +551,7 @@ export const SocialView: React.FC<SocialViewProps> = ({
   return (
     <div className="min-h-full p-6 space-y-6 select-none max-w-[1600px] mx-auto">
       {/* 1. HERO HEADER BANNER */}
-      <div className="relative rounded-3xl overflow-hidden border border-white/[0.1] shadow-2xl h-56 md:h-64 group">
+      <div className="w-full relative rounded-3xl overflow-hidden border border-white/[0.1] shadow-2xl h-[200px] sm:h-[215px] lg:h-[225px] xl:h-[235px] group shrink-0">
         <img
           src={bgCampfireFriends}
           alt="Friends Banner"

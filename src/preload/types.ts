@@ -449,6 +449,11 @@ export interface GalaxyAPI {
     memoryMax?: number;
     jvmArgs?: string;
     javaPath?: string;
+    resolution?: {
+      width: number;
+      height: number;
+      fullscreen: boolean;
+    };
   }) => Promise<Instance>;
   updateInstance: (inst: Instance) => Promise<Instance>;
   deleteInstance: (id: string) => Promise<boolean>;
@@ -467,6 +472,7 @@ export interface GalaxyAPI {
   openExternal: (url: string) => Promise<boolean>;
   getWorldSaves: (id: string) => Promise<WorldSave[]>;
   openInstanceFolder: (id: string, subDir?: string) => Promise<void>;
+  openInstancesRootDir: () => Promise<void>;
   createWorldBackup: (id: string, worldFolderName: string) => Promise<any>;
   listWorldBackups: (id: string) => Promise<any[]>;
   restoreWorldBackup: (id: string, backupFilename: string) => Promise<boolean>;

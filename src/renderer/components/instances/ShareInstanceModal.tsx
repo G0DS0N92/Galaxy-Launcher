@@ -113,25 +113,27 @@ export const ShareInstanceModal: React.FC<ShareInstanceModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
-      <div className="relative w-full max-w-lg bg-galaxy-900 border border-white/[0.12] rounded-3xl p-6 shadow-2xl overflow-hidden">
+      <div className="relative w-full max-w-xl bg-galaxy-900 border border-white/[0.12] rounded-3xl p-6 shadow-2xl overflow-hidden">
         {/* Glow backdrop effect */}
         <div className="absolute -top-24 -right-24 w-64 h-64 bg-cyan-500/15 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-purple-500/15 rounded-full blur-3xl pointer-events-none" />
 
         {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-white/[0.08] relative z-10">
-          <div className="flex items-center space-x-3">
-            <div className="p-2.5 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
-              <Share2 className="w-6 h-6 stroke-[2.2]" />
+        <div className="flex items-center justify-between pb-4 border-b border-white/[0.08] relative z-10 gap-3">
+          <div className="flex items-center gap-3.5 min-w-0 flex-1">
+            <div className="p-2.5 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 shrink-0">
+              <Share2 className="w-5 h-5 stroke-[2.2]" />
             </div>
-            <div>
-              <h3 className="font-display font-black text-lg text-white tracking-wide flex items-center gap-2">
-                1-Click Instance Share Code
-                <span className="text-[10px] uppercase font-mono tracking-widest px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2.5">
+                <h3 className="font-display font-bold text-base sm:text-lg text-white tracking-wide whitespace-nowrap">
+                  1-Click Instance Share Code
+                </h3>
+                <span className="text-[10px] uppercase font-mono tracking-wider px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 whitespace-nowrap shrink-0 font-semibold">
                   Instant Clone
                 </span>
-              </h3>
-              <p className="text-xs text-slate-400 font-medium">
+              </div>
+              <p className="text-xs text-slate-400 font-medium truncate mt-0.5">
                 Share this code with your friends to let them clone this exact instance instantly.
               </p>
             </div>
@@ -141,7 +143,8 @@ export const ShareInstanceModal: React.FC<ShareInstanceModalProps> = ({
               sounds.playSwitch();
               onClose();
             }}
-            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.06] transition-all"
+            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.06] transition-all shrink-0 cursor-pointer"
+            title="Close"
           >
             <X className="w-5 h-5" />
           </button>

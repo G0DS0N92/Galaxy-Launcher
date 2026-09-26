@@ -19,7 +19,7 @@ export class JavaDetector {
       const javaExe = process.platform === 'win32'
         ? path.join(process.env.JAVA_HOME, 'bin', 'java.exe')
         : path.join(process.env.JAVA_HOME, 'bin', 'java');
-      candidates.push(javaExe);
+      if (fs.existsSync(javaExe)) candidates.push(javaExe);
     }
 
     // 2. Check PATH 'java'
@@ -27,7 +27,7 @@ export class JavaDetector {
       const whichCmd = process.platform === 'win32' ? 'where java' : 'which java';
       const pathJava = execSync(whichCmd, { encoding: 'utf-8' }).trim().split(/\r?\n/);
       for (const line of pathJava) {
-        if (line && fs.existsSync(line)) {
+        if (line && fs.existsSync(line.trim())) {
           candidates.push(line.trim());
         }
       }
@@ -35,65 +35,118 @@ export class JavaDetector {
       // Ignored if where/which fails
     }
 
-    // 3. Check custom launcher runtimes directory
+    // 3. Check custom launcher runtimes directory & local AppData
     const appData = process.env['APPDATA'] || (process.platform === 'darwin' ? process.env['HOME'] + '/Library/Preferences' : '/var/local');
-    const defaultRuntimesDir = customRuntimesDir || path.join(appData, 'GalaxyLauncher', 'runtimes');
-    if (fs.existsSync(defaultRuntimesDir)) {
-      try {
-        const findJavaInDir = (dir: string, depth = 0) => {
-          if (depth > 4) return;
-          const entries = fs.readdirSync(dir, { withFileTypes: true });
-          for (const e of entries) {
-            const full = path.join(dir, e.name);
-            if (e.isDirectory()) {
-              findJavaInDir(full, depth + 1);
-            } else if (e.name.toLowerCase() === 'java.exe' || (process.platform !== 'win32' && e.name === 'java')) {
-              candidates.push(full);
+    const userHome = process.env['USERPROFILE'] || process.env['HOME'] || '';
+    const runtimesCandidates = [
+      customRuntimesDir,
+      path.join(appData, 'GalaxyLauncher', 'runtimes'),
+      path.join(userHome, '.jdks'),
+      path.join(userHome, '.gradle', 'jdks')
+    ].filter(Boolean) as string[];
+
+    for (const rDir of runtimesCandidates) {
+      if (fs.existsSync(rDir)) {
+        try {
+          const findJavaInDir = (dir: string, depth = 0) => {
+            if (depth > 4) return;
+            const entries = fs.readdirSync(dir, { withFileTypes: true });
+            for (const e of entries) {
+              const full = path.join(dir, e.name);
+              if (e.isDirectory()) {
+                findJavaInDir(full, depth + 1);
+              } else if (e.name.toLowerCase() === 'java.exe' || (process.platform !== 'win32' && e.name === 'java')) {
+                candidates.push(full);
+              }
             }
-          }
-        };
-        findJavaInDir(defaultRuntimesDir);
-      } catch {
-        // Ignored
+          };
+          findJavaInDir(rDir);
+        } catch {}
       }
     }
 
-    // 4. Check common Windows Program Files directories
+    // 4. Check common Windows Program Files directories & Local Programs
     if (process.platform === 'win32') {
       const programFiles = [
         process.env['ProgramFiles'] || 'C:\\Program Files',
         process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)',
-        path.join(process.env['LOCALAPPDATA'] || 'C:\\Users\\Admin\\AppData\\Local', 'Programs')
+        path.join(process.env['LOCALAPPDATA'] || path.join(userHome, 'AppData', 'Local'), 'Programs'),
+        'C:\\ProgramData\\Oracle\\Java\\javapath'
       ];
 
       const vendorDirs = [
         'Java',
         'Eclipse Adoptium',
+        'AdoptOpenJDK',
         'BellSoft',
         'Amazon Corretto',
         'Zulu',
         'Microsoft',
-        'Semeru'
+        'Semeru',
+        'RedHat',
+        'SapMachine',
+        'GraalVM'
       ];
 
       for (const pf of programFiles) {
         if (!fs.existsSync(pf)) continue;
+        // Direct java.exe check (e.g. javapath)
+        const directExe = path.join(pf, 'java.exe');
+        if (fs.existsSync(directExe)) {
+          candidates.push(directExe);
+        }
+
         for (const vDir of vendorDirs) {
           const parentDir = path.join(pf, vDir);
           if (fs.existsSync(parentDir)) {
             try {
-              const subDirs = fs.readdirSync(parentDir);
-              for (const sub of subDirs) {
-                const javaExe = path.join(parentDir, sub, 'bin', 'java.exe');
-                if (fs.existsSync(javaExe)) {
-                  candidates.push(javaExe);
+              const scanVendorDir = (dir: string, depth = 0) => {
+                if (depth > 3) return;
+                const entries = fs.readdirSync(dir, { withFileTypes: true });
+                for (const e of entries) {
+                  const full = path.join(dir, e.name);
+                  if (e.isDirectory()) {
+                    const subJava = path.join(full, 'bin', 'java.exe');
+                    if (fs.existsSync(subJava)) {
+                      candidates.push(subJava);
+                    } else {
+                      scanVendorDir(full, depth + 1);
+                    }
+                  } else if (e.name.toLowerCase() === 'java.exe') {
+                    candidates.push(full);
+                  }
                 }
-              }
-            } catch {
-              // Directory read error ignore
-            }
+              };
+              scanVendorDir(parentDir);
+            } catch {}
           }
         }
+      }
+
+      // Windows Registry queries for JavaSoft and Eclipse Adoptium
+      const regKeys = [
+        'HKLM\\SOFTWARE\\JavaSoft\\Java Development Kit',
+        'HKLM\\SOFTWARE\\JavaSoft\\Java Runtime Environment',
+        'HKLM\\SOFTWARE\\JavaSoft\\JDK',
+        'HKLM\\SOFTWARE\\JavaSoft\\JRE',
+        'HKLM\\SOFTWARE\\Eclipse Adoptium\\JDK',
+        'HKLM\\SOFTWARE\\Eclipse Adoptium\\JRE',
+        'HKLM\\SOFTWARE\\AdoptOpenJDK\\JDK',
+        'HKLM\\SOFTWARE\\AdoptOpenJDK\\JRE'
+      ];
+
+      for (const rk of regKeys) {
+        try {
+          const regOutput = execSync(`reg query "${rk}" /s /v JavaHome 2>nul`, { encoding: 'utf-8' });
+          const matches = regOutput.matchAll(/JavaHome\s+REG_SZ\s+(.+)/gi);
+          for (const m of matches) {
+            const home = m[1]?.trim();
+            if (home) {
+              const jExe = path.join(home, 'bin', 'java.exe');
+              if (fs.existsSync(jExe)) candidates.push(jExe);
+            }
+          }
+        } catch {}
       }
     }
 

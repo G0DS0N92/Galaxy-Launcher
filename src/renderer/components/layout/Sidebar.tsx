@@ -8,9 +8,7 @@ import {
   Trophy,
   User,
   Settings,
-  Sparkles,
-  Layers,
-  Sparkle
+  Sparkles
 } from 'lucide-react';
 import { sounds } from '../../services/soundEngine';
 import sidebarPortalArt from '../../assets/instance_backgrounds/bg_sidebar_portal.jpg';
@@ -69,10 +67,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   return (
-    <aside className="w-56 xl:w-60 h-[calc(100vh-2.75rem)] flex flex-col justify-between p-3 bg-galaxy-950/85 backdrop-blur-2xl border-r border-white/[0.07] select-none z-40 flex-shrink-0">
+    <aside className="w-64 h-[calc(100vh-2.75rem)] flex flex-col justify-between p-3.5 bg-galaxy-950/90 backdrop-blur-2xl border-r border-white/[0.07] select-none z-40 flex-shrink-0">
       {/* Top Nav List */}
-      <div className="space-y-1 overflow-y-auto custom-scrollbar flex-1 pr-0.5">
-        <nav className="space-y-1">
+      <div className="shrink-0 pr-0.5 space-y-1.5">
+        <nav className="space-y-1.5">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive =
@@ -87,23 +85,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   sounds.playSwitch();
                   onSelectTab(item.id);
                 }}
-                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-[13px] font-semibold tracking-wide transition-all group relative ${
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-sm font-semibold tracking-wide transition-all duration-200 group relative ${
                   isActive
-                    ? 'bg-gradient-to-r from-blue-600/90 via-indigo-600/90 to-purple-600/90 text-white font-bold shadow-glow-sm border border-white/20'
+                    ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white font-bold shadow-[0_0_20px_rgba(99,102,241,0.5)] border border-white/20'
                     : 'text-slate-300 hover:text-white hover:bg-white/[0.06] border border-transparent'
                 }`}
               >
-                <div className="flex items-center space-x-3 min-w-0">
+                <div className="flex items-center space-x-3.5 min-w-0">
                   <Icon
-                    className={`w-4 h-4 stroke-[2.2] shrink-0 transition-transform duration-200 group-hover:scale-110 ${
-                      isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'
+                    className={`w-5 h-5 stroke-[2] shrink-0 transition-transform duration-200 group-hover:scale-110 ${
+                      isActive ? 'text-white' : 'text-slate-400 group-hover:text-white'
                     }`}
                   />
                   <span className="truncate">{item.label}</span>
                 </div>
                 {item.badge !== undefined && (
                   <span
-                    className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md shrink-0 whitespace-nowrap ${
+                    className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap ${
                       isActive
                         ? 'bg-white/25 text-white'
                         : 'bg-white/[0.08] text-slate-400'
@@ -118,19 +116,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </nav>
       </div>
 
-      {/* Atmospheric Vertical Portal Art Card */}
-      <div className="relative rounded-2xl overflow-hidden border border-white/[0.1] shadow-2xl h-44 xl:h-48 my-2 shrink-0 group">
+      {/* Seamless Atmospheric Portal Art Card (Expands Vertically to Fill Space) */}
+      <div className="relative rounded-2xl overflow-hidden my-2 flex-1 w-full min-h-[240px] flex flex-col justify-end group">
         <img
           src={sidebarPortalArt}
           alt="Galaxy Portal"
-          className="absolute inset-0 w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700"
+          className="absolute inset-0 w-full h-full object-cover object-[center_35%] group-hover:scale-105 transition-transform duration-700"
+          style={{
+            maskImage: 'linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)',
+            WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)'
+          }}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-galaxy-950 via-galaxy-950/40 to-transparent" />
-        <div className="absolute inset-0 bg-purple-950/20 mix-blend-color" />
+        <div className="absolute inset-0 bg-gradient-to-t from-galaxy-950/95 via-transparent to-galaxy-950/40 pointer-events-none" />
         
         {/* Quote text overlay */}
-        <div className="absolute bottom-2.5 left-2.5 right-2.5 text-center">
-          <p className="text-[10.5px] xl:text-[11px] font-display font-medium text-slate-300/90 italic tracking-wider whitespace-pre-line leading-tight drop-shadow-md">
+        <div className="relative z-10 text-center pb-4 px-2 pointer-events-none">
+          <p className="text-xs xl:text-[13px] font-display font-bold text-white/95 italic tracking-wider whitespace-pre-line leading-snug drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)]">
             {getQuoteForTab(activeTab)}
           </p>
         </div>
@@ -143,13 +144,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
             sounds.playSwitch();
             onSelectTab('settings');
           }}
-          className={`w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-[13px] font-semibold tracking-wide transition-all ${
+          className={`w-full flex items-center space-x-3.5 px-4 py-3 rounded-2xl text-sm font-semibold tracking-wide transition-all ${
             activeTab === 'settings'
-              ? 'bg-gradient-to-r from-blue-600/90 to-purple-600/90 text-white font-bold shadow-glow-sm border border-white/20'
+              ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white font-bold shadow-[0_0_20px_rgba(99,102,241,0.5)] border border-white/20'
               : 'text-slate-300 hover:text-white hover:bg-white/[0.06] border border-transparent'
           }`}
         >
-          <Settings className="w-4 h-4 text-slate-400 hover:text-slate-200 shrink-0" />
+          <Settings className="w-5 h-5 text-slate-400 group-hover:text-slate-200 shrink-0" />
           <span>Settings</span>
         </button>
       </div>

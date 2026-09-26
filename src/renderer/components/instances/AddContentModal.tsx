@@ -66,6 +66,97 @@ export const AddContentModal: React.FC<AddContentModalProps> = ({
   const [installingId, setInstallingId] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
 
+  // Multi-Selection State for Batch Installation
+  const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
+  const [batchInstalling, setBatchInstalling] = useState(false);
+  const [batchProgress, setBatchProgress] = useState(0);
+
+  const typeLabel = useMemo(() => {
+    if (activeType === 'resourcepack') return 'Resource Pack';
+    if (activeType === 'shader') return 'Shader';
+    if (activeType === 'modpack') return 'Modpack';
+    return 'Mod';
+  }, [activeType]);
+
+  const typeLabelPlural = useMemo(() => {
+    if (activeType === 'resourcepack') return 'Resource Packs';
+    if (activeType === 'shader') return 'Shaders';
+    if (activeType === 'modpack') return 'Modpacks';
+    return 'Mods';
+  }, [activeType]);
+
+  const toggleSelectProject = (proj: MarketplaceProject, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (isProjectInstalled(proj)) return;
+    sounds.playClick();
+    setSelectedProjectIds((prev) =>
+      prev.includes(proj.id) ? prev.filter((id) => id !== proj.id) : [...prev, proj.id]
+    );
+  };
+
+  const handleInstallBatch = async () => {
+    if (!window.galaxy || selectedProjectIds.length === 0) return;
+    setBatchInstalling(true);
+    setBatchProgress(0);
+    sounds.playClick();
+
+    const selectedProjectsList = projects.filter((p) => selectedProjectIds.includes(p.id));
+    let successCount = 0;
+
+    for (let i = 0; i < selectedProjectsList.length; i++) {
+      const proj = selectedProjectsList[i];
+      setBatchProgress(i + 1);
+      try {
+        const versions = await window.galaxy.getMarketplaceVersions(
+          proj.id,
+          [instance.loader],
+          [instance.version]
+        );
+        const verToInstall = versions[0] || (await window.galaxy.getMarketplaceVersions(proj.id))[0];
+        if (verToInstall && verToInstall.files && verToInstall.files.length > 0) {
+          const file = verToInstall.files.find((f) => f.primary) || verToInstall.files[0];
+          if (activeType === 'mod') {
+            await window.galaxy.installMarketplaceModWithDependencies(
+              instance.id,
+              file.url,
+              file.filename,
+              file.hashes?.sha1,
+              verToInstall.dependencies,
+              instance.loader,
+              instance.version
+            );
+          } else if (activeType === 'modpack') {
+            await window.galaxy.installModpack(file.url, proj.title);
+          } else {
+            await window.galaxy.installMarketplaceItem(
+              instance.id,
+              activeType as 'resourcepack' | 'shader',
+              file.url,
+              file.filename,
+              file.hashes?.sha1
+            );
+          }
+          successCount++;
+        }
+      } catch (err) {
+        console.error('Failed to batch install ' + proj.title + ':', err);
+      }
+    }
+
+    setBatchInstalling(false);
+    setSelectedProjectIds([]);
+    sounds.playSuccess();
+    await loadInstalledContent();
+    onContentChanged();
+
+    onShowToast({
+      id: Math.random().toString(),
+      type: 'success',
+      title: 'Batch Install Completed!',
+      message: 'Successfully installed ' + successCount + ' ' + (activeType === 'resourcepack' ? 'resource pack' : activeType === 'shader' ? 'shader' : activeType === 'modpack' ? 'modpack' : 'mod') + (successCount === 1 ? '' : 's') + '.'
+    });
+  };
+
   // Details Sub-Modal
   const [selectedProject, setSelectedProject] = useState<MarketplaceProject | null>(null);
   const [projectVersions, setProjectVersions] = useState<MarketplaceVersion[]>([]);
@@ -76,6 +167,7 @@ export const AddContentModal: React.FC<AddContentModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setActiveType(initialType);
+      setSelectedProjectIds([]);
       loadInstalledContent();
       fetchProjects(true, initialType);
     }
@@ -85,6 +177,7 @@ export const AddContentModal: React.FC<AddContentModalProps> = ({
     if (isOpen) {
       setOffset(0);
       setProjects([]);
+      setSelectedProjectIds([]);
       setHasMore(true);
       fetchProjects(true, activeType);
     }
@@ -556,15 +649,22 @@ export const AddContentModal: React.FC<AddContentModalProps> = ({
                 const isInstalled = isProjectInstalled(proj);
                 const isInstalling = installingId === proj.id;
                 const isRemoving = removingId === proj.id;
+                const isSelected = selectedProjectIds.includes(proj.id);
 
                 return (
                   <div
                     key={proj.id}
-                    onClick={() => handleOpenProjectDetails(proj)}
-                    className={`group relative p-4 rounded-2xl border transition-all duration-150 cursor-pointer flex flex-col justify-between shadow-lg overflow-hidden ${
-                      isInstalled
-                        ? 'border-emerald-500/40 bg-emerald-950/20 hover:bg-emerald-950/35 hover:border-emerald-500/60'
-                        : 'border-white/[0.08] bg-[#0d1122]/90 hover:bg-[#131933] hover:border-purple-500/40'
+                    onClick={() => {
+                      if (!isInstalled) {
+                        toggleSelectProject(proj);
+                      }
+                    }}
+                    className={`group relative p-4 rounded-2xl border transition-all duration-150 flex flex-col justify-between shadow-lg overflow-hidden ${
+                      !isInstalled && isSelected
+                        ? 'border-emerald-400 ring-2 ring-emerald-400/60 shadow-[0_0_22px_rgba(16,185,129,0.55)] bg-emerald-950/30 cursor-pointer'
+                        : isInstalled
+                        ? 'border-emerald-500/35 bg-emerald-950/15 hover:border-emerald-500/50 hover:bg-emerald-950/25'
+                        : 'border-white/[0.08] bg-[#0d1122]/90 hover:bg-[#131933] hover:border-blue-500/40 cursor-pointer'
                     }`}
                   >
                     <div className="space-y-2.5">
@@ -582,11 +682,26 @@ export const AddContentModal: React.FC<AddContentModalProps> = ({
                             <h4 className="font-bold text-xs text-slate-100 group-hover:text-emerald-300 transition-colors truncate">
                               {proj.title}
                             </h4>
-                            {isInstalled && (
-                              <span className="px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[9px] font-mono font-bold shrink-0">
-                                INSTALLED
-                              </span>
-                            )}
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {isInstalled ? (
+                                <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/35 text-[9px] font-mono font-bold tracking-wider shadow-sm">
+                                  INSTALLED
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={(e) => toggleSelectProject(proj, e)}
+                                  className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all cursor-pointer ${
+                                    isSelected
+                                      ? 'bg-emerald-500 border-emerald-400 text-black shadow-[0_0_10px_#10b981]'
+                                      : 'border-white/20 bg-black/40 text-transparent hover:border-emerald-400/60'
+                                  }`}
+                                  title={isSelected ? 'Deselect' : 'Select'}
+                                >
+                                  <Check className="w-3.5 h-3.5 stroke-[3]" />
+                                </button>
+                              )}
+                            </div>
                           </div>
                           <div className="text-[10px] text-slate-400 truncate">
                             by <span className="text-slate-300">{proj.author}</span>
@@ -610,36 +725,46 @@ export const AddContentModal: React.FC<AddContentModalProps> = ({
                       </div>
                     </div>
 
-                    {/* Card Footer with Compact Stats and Emoji Action Buttons */}
+                    {/* Card Footer with Compact Stats and Action Buttons */}
                     <div className="mt-3 pt-2.5 border-t border-white/[0.06] flex items-center justify-between text-xs">
-                      {/* Compact Stats */}
-                      <div className="flex items-center space-x-2 text-[10px] text-slate-400 font-mono">
-                        <span className="flex items-center space-x-1" title={`${proj.downloads.toLocaleString()} downloads`}>
-                          <Download className="w-3 h-3 text-cyan-400" />
-                          <span>{formatCompactNumber(proj.downloads)}</span>
-                        </span>
-                        <span className="flex items-center space-x-1" title={`${proj.follows.toLocaleString()} followers`}>
-                          <Star className="w-3 h-3 text-amber-400" />
-                          <span>{formatCompactNumber(proj.follows)}</span>
-                        </span>
+                      {/* High-Trust Stats Badges */}
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/25 text-cyan-300 font-semibold text-xs shadow-sm"
+                          title={`${proj.downloads.toLocaleString()} downloads`}
+                        >
+                          <Download className="w-3.5 h-3.5 text-cyan-400 stroke-[2.2]" />
+                          <span className="tracking-tight">{formatCompactNumber(proj.downloads)}</span>
+                        </div>
+                        <div
+                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/25 text-amber-300 font-semibold text-xs shadow-sm"
+                          title={`${proj.follows.toLocaleString()} favorites / followers`}
+                        >
+                          <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400/30 stroke-[2.2]" />
+                          <span className="tracking-tight">{formatCompactNumber(proj.follows)}</span>
+                        </div>
                       </div>
 
-                      {/* Action Buttons */}
+                      {/* Action Buttons: Pure Icon Buttons with Tooltips */}
                       <div className="flex items-center space-x-1.5 shrink-0">
-                        {/* Details Button */}
+                        {/* Details (ⓘ) -> Redirects to Website */}
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleOpenProjectDetails(proj);
+                            sounds.playClick();
+                            const targetUrl = `https://modrinth.com/${proj.projectType || activeType}/${proj.slug || proj.id}`;
+                            if (window.galaxy?.openExternal) {
+                              window.galaxy.openExternal(targetUrl);
+                            }
                           }}
-                          className="p-1.5 px-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.14] border border-white/[0.1] text-slate-300 hover:text-white transition-all hover:scale-105 active:scale-95 shadow-sm cursor-pointer flex items-center justify-center"
-                          title="View Details & Versions"
+                          className="w-8 h-8 rounded-xl bg-white/[0.06] hover:bg-white/[0.14] border border-white/[0.1] text-slate-300 hover:text-white transition-all hover:scale-105 active:scale-95 shadow-sm cursor-pointer flex items-center justify-center"
+                          title="Details"
                         >
-                          <Info className="w-3.5 h-3.5" />
+                          <Info className="w-4 h-4" />
                         </button>
 
-                        {/* Remove Button (if installed) */}
+                        {/* Remove (🗑) -> Only for installed content */}
                         {isInstalled && (
                           <button
                             type="button"
@@ -648,50 +773,45 @@ export const AddContentModal: React.FC<AddContentModalProps> = ({
                               handleRemoveProject(proj);
                             }}
                             disabled={isRemoving}
-                            className="p-1.5 px-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/30 border border-rose-500/30 hover:border-rose-500/60 text-rose-300 hover:text-rose-100 transition-all hover:scale-105 active:scale-95 shadow-sm cursor-pointer flex items-center justify-center"
-                            title="Remove from this instance"
+                            className="w-8 h-8 rounded-xl bg-rose-500/15 hover:bg-rose-500/30 border border-rose-500/30 hover:border-rose-500/60 text-rose-300 hover:text-rose-100 transition-all hover:scale-105 active:scale-95 shadow-sm cursor-pointer flex items-center justify-center"
+                            title={`Remove ${typeLabel}`}
                           >
                             {isRemoving ? (
-                              <Loader2 className="w-3.5 h-3.5 animate-spin text-rose-300" />
+                              <Loader2 className="w-4 h-4 animate-spin text-rose-300" />
                             ) : (
-                              <Trash2 className="w-3.5 h-3.5" />
+                              <Trash2 className="w-4 h-4" />
                             )}
                           </button>
                         )}
 
-                        {/* Install Button (or Installed Checkmark) */}
-                        {isInstalled ? (
-                          <div
-                            onClick={(e) => e.stopPropagation()}
-                            className="p-1.5 px-2 rounded-xl bg-emerald-500/20 border border-emerald-500/35 text-emerald-300 text-xs font-semibold flex items-center justify-center shadow-sm cursor-default"
-                            title="Installed in this instance"
-                          >
-                            <Check className="w-3.5 h-3.5" />
-                          </div>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleInstallProject(proj);
-                            }}
-                            disabled={isInstalling}
-                            className="p-1.5 px-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-bold text-xs shadow-glow-emerald flex items-center justify-center space-x-1 transition-all hover:scale-105 active:scale-95 border border-emerald-400/30 cursor-pointer"
-                            title="Install into this instance"
-                          >
-                            {isInstalling ? (
-                              <RefreshCw className="w-3.5 h-3.5 animate-spin text-white" />
-                            ) : (
-                              <Download className="w-3.5 h-3.5" />
-                            )}
-                          </button>
-                        )}
+                        {/* Install / Version Prompter (⬇ or ✓) */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenProjectDetails(proj);
+                          }}
+                          disabled={isInstalling}
+                          className={`w-8 h-8 rounded-xl transition-all hover:scale-105 active:scale-95 shadow-sm cursor-pointer flex items-center justify-center ${
+                            isInstalled
+                              ? 'bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/35 text-emerald-400 hover:text-emerald-200'
+                              : 'bg-emerald-600 hover:bg-emerald-500 border border-emerald-400/40 text-white shadow-[0_0_12px_rgba(16,185,129,0.35)]'
+                          }`}
+                          title={isInstalled ? `Install / Switch Version (${typeLabel})` : `Install ${typeLabel}`}
+                        >
+                          {isInstalling ? (
+                            <RefreshCw className="w-4 h-4 animate-spin" />
+                          ) : isInstalled ? (
+                            <Check className="w-4 h-4 stroke-[2.5]" />
+                          ) : (
+                            <Download className="w-4 h-4 stroke-[2.2]" />
+                          )}
+                        </button>
                       </div>
                     </div>
                   </div>
                 );
               })}
-
               {loadingMore && (
                 <div className="col-span-full py-6 flex justify-center">
                   <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center space-x-2 text-emerald-300 text-xs font-mono">
@@ -703,6 +823,44 @@ export const AddContentModal: React.FC<AddContentModalProps> = ({
             </div>
           )}
         </div>
+
+        {/* Multi-Selection Batch Action Bar */}
+        {selectedProjectIds.length > 0 && (
+          <div className="p-3.5 border-t border-white/[0.08] bg-galaxy-950/95 flex items-center justify-between gap-3 shadow-2xl z-20">
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4" />
+                <span>{selectedProjectIds.length} {typeLabel}{selectedProjectIds.length > 1 ? 's' : ''} selected</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedProjectIds([])}
+                className="text-[11px] text-slate-400 hover:text-white px-2 py-0.5 rounded cursor-pointer transition-colors"
+              >
+                Clear Selection
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleInstallBatch}
+              disabled={batchInstalling}
+              className="px-6 py-2.5 rounded-xl bg-[#00e676] hover:bg-[#00c853] text-[#052e16] font-black text-xs shadow-[0_0_20px_rgba(0,230,118,0.5)] flex items-center gap-2 active:scale-95 transition-all cursor-pointer"
+            >
+              {batchInstalling ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>Installing ({batchProgress} / {selectedProjectIds.length})...</span>
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4 stroke-[2.5]" />
+                  <span>Install {selectedProjectIds.length} Selected {typeLabelPlural}</span>
+                </>
+              )}
+            </button>
+          </div>
+        )}
 
         {/* Project Details Modal */}
         {selectedProject && (
@@ -773,7 +931,7 @@ export const AddContentModal: React.FC<AddContentModalProps> = ({
                           className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] flex items-center space-x-1 shadow-sm cursor-pointer"
                         >
                           <Download className="w-3 h-3" />
-                          <span>Install</span>
+                          <span>Install {typeLabel}</span>
                         </button>
                       </div>
                     ))}

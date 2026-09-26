@@ -45,7 +45,7 @@ export class ScreenshotsManager {
                     instanceName: inst.name,
                     createdAt: stat.birthtime.toISOString() || stat.mtime.toISOString(),
                     sizeBytes: stat.size,
-                    previewUrl: `galaxy-file://${encodeURIComponent(fullPath.replace(/\\/g, '/'))}`
+                    previewUrl: `galaxy-file://image?path=${encodeURIComponent(fullPath)}`
                   });
                 } catch {
                   // ignore unreadable file
@@ -77,7 +77,7 @@ export class ScreenshotsManager {
                 instanceName: 'Global Gallery',
                 createdAt: stat.birthtime.toISOString() || stat.mtime.toISOString(),
                 sizeBytes: stat.size,
-                previewUrl: `galaxy-file://${encodeURIComponent(fullPath.replace(/\\/g, '/'))}`
+                previewUrl: `galaxy-file://image?path=${encodeURIComponent(fullPath)}`
               });
             } catch {
               // ignore
@@ -97,8 +97,55 @@ export class ScreenshotsManager {
    * Scans screenshots for a specific instance
    */
   public async getScreenshotsByInstance(instanceId: string): Promise<ScreenshotItem[]> {
-    const all = await this.getAllScreenshots();
-    return all.filter((s) => s.instanceId === instanceId);
+    const results: ScreenshotItem[] = [];
+    const inst = await this.instanceManager.getInstance(instanceId);
+    if (!inst) return [];
+
+    const instPath = this.instanceManager.getInstancePath(inst.id);
+    const possibleDirs = [
+      path.join(instPath, 'screenshots'),
+      path.join(instPath, '.minecraft', 'screenshots')
+    ];
+
+    const seenPaths = new Set<string>();
+
+    for (const dir of possibleDirs) {
+      if (fs.existsSync(dir)) {
+        try {
+          const files = fs.readdirSync(dir);
+          for (const file of files) {
+            if (/\.(png|jpg|jpeg|webp)$/i.test(file)) {
+              const fullPath = path.join(dir, file);
+              if (seenPaths.has(fullPath)) continue;
+              seenPaths.add(fullPath);
+
+              try {
+                if (fs.existsSync(fullPath)) {
+                  const stat = fs.statSync(fullPath);
+                  results.push({
+                    id: `${inst.id}_${file}`,
+                    filename: file,
+                    filePath: fullPath,
+                    instanceId: inst.id,
+                    instanceName: inst.name,
+                    createdAt: stat.birthtime.toISOString() || stat.mtime.toISOString(),
+                    sizeBytes: stat.size,
+                    previewUrl: `galaxy-file://image?path=${encodeURIComponent(fullPath)}`
+                  });
+                }
+              } catch {
+                // ignore
+              }
+            }
+          }
+        } catch (err) {
+          console.warn(`[ScreenshotsManager] Error reading dir ${dir}:`, err);
+        }
+      }
+    }
+
+    // Sort newest first
+    return results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
   /**

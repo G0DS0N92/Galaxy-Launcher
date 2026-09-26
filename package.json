@@ -8,7 +8,7 @@
     "dev": "vite",
     "start": "electron .",
     "launch": "npm run build && electron .",
-    "build": "tsc && vite build && esbuild src/preload/index.ts --bundle --platform=node --outfile=dist-electron/preload/index.cjs --format=cjs --external:electron",
+    "build": "tsc && vite build && esbuild src/preload/index.ts --bundle --platform=node --outfile=dist-electron/preload/index.cjs --format=cjs --external:electron && node scripts/sync-installed.mjs",
     "preview": "vite preview",
     "pack": "npm run build && electron-builder --dir",
     "dist": "npm run build && electron-builder --win nsis",

@@ -595,12 +595,36 @@ export class MinecraftLauncher {
       '--versionType', 'Galaxy Launcher'
     ];
 
-    if (instance.resolution) {
-      gameArgs.push('--width', String(instance.resolution.width || 1280));
-      gameArgs.push('--height', String(instance.resolution.height || 720));
-      if (instance.resolution.fullscreen) {
-        gameArgs.push('--fullscreen');
+    const targetWidth = instance.resolution?.width || 1920;
+    const targetHeight = instance.resolution?.height || 1080;
+    const isFullscreen = instance.resolution?.fullscreen ?? true;
+
+    gameArgs.push('--width', String(targetWidth));
+    gameArgs.push('--height', String(targetHeight));
+    if (isFullscreen) {
+      gameArgs.push('--fullscreen');
+    }
+
+    // Synchronize options.txt so Minecraft launches with V-Sync OFF and Fullscreen ON
+    try {
+      const optionsPath = path.join(instancePath, 'options.txt');
+      let optionsStr = '';
+      if (fs.existsSync(optionsPath)) {
+        optionsStr = await fs.promises.readFile(optionsPath, 'utf-8');
       }
+      if (/^enableVsync:/m.test(optionsStr)) {
+        optionsStr = optionsStr.replace(/^enableVsync:.*$/m, 'enableVsync:false');
+      } else {
+        optionsStr += '\nenableVsync:false\n';
+      }
+      if (/^fullscreen:/m.test(optionsStr)) {
+        optionsStr = optionsStr.replace(/^fullscreen:.*$/m, `fullscreen:${isFullscreen}`);
+      } else {
+        optionsStr += `\nfullscreen:${isFullscreen}\n`;
+      }
+      await fs.promises.writeFile(optionsPath, optionsStr.trim() + '\n', 'utf-8');
+    } catch (optErr) {
+      console.warn('[MinecraftLauncher] Could not sync options.txt:', optErr);
     }
 
     onProgress({

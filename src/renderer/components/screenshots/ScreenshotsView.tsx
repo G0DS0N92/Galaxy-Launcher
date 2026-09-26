@@ -40,22 +40,36 @@ export const ScreenshotsView: React.FC<ScreenshotsViewProps> = ({ instances }) =
   // Deletion modal state
   const [deleteTarget, setDeleteTarget] = useState<ScreenshotItem | null>(null);
 
-  const fetchScreenshots = async () => {
-    setLoading(true);
+  const fetchScreenshots = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       if (window.galaxy?.getScreenshots) {
         const list = await window.galaxy.getScreenshots();
-        setScreenshots(list);
+        setScreenshots(list || []);
       }
     } catch (err) {
       console.error('Failed to load screenshots:', err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchScreenshots();
+
+    const onFocus = () => {
+      fetchScreenshots(true);
+    };
+    window.addEventListener('focus', onFocus);
+
+    const interval = setInterval(() => {
+      fetchScreenshots(true);
+    }, 2000);
+
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      clearInterval(interval);
+    };
   }, []);
 
   // Filter & Sort
@@ -321,13 +335,12 @@ export const ScreenshotsView: React.FC<ScreenshotsViewProps> = ({ instances }) =
                   {/* Thumbnail Image Container */}
                   <div className="relative aspect-video w-full overflow-hidden bg-black/40">
                     <img
-                      src={item.previewUrl}
-                      alt={item.filename}
+                      src={item.previewUrl || `galaxy-file://image?path=${encodeURIComponent(item.filePath)}`}
+                      alt=""
                       loading="lazy"
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 select-none"
                       onError={(e) => {
-                        // Fallback placeholder on broken image
-                        (e.target as HTMLImageElement).src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="%23666" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>';
+                        (e.target as HTMLElement).style.opacity = '0';
                       }}
                     />
 
@@ -506,8 +519,8 @@ export const ScreenshotsView: React.FC<ScreenshotsViewProps> = ({ instances }) =
             {/* Centered Image */}
             <div className="max-w-full max-h-full flex items-center justify-center p-4 transition-transform duration-200">
               <img
-                src={activeScreenshot.previewUrl}
-                alt={activeScreenshot.filename}
+                src={activeScreenshot.previewUrl || `galaxy-file://image?path=${encodeURIComponent(activeScreenshot.filePath)}`}
+                alt=""
                 style={{ transform: `scale(${lightboxZoom})` }}
                 className="max-w-[85vw] max-h-[75vh] object-contain rounded-xl shadow-2xl transition-transform duration-200 border border-white/[0.08]"
               />

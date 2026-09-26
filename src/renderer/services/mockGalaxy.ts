@@ -51,7 +51,7 @@ export function setupMockGalaxy(): void {
           memoryMin: options.memoryMin || 2048,
           memoryMax: options.memoryMax || 4096,
           playTimeMinutes: 0,
-          resolution: { width: 1280, height: 720, fullscreen: false },
+          resolution: { width: 1920, height: 1080, fullscreen: true },
           createdAt: new Date().toISOString()
         };
         mockInstances.push(newInst);
@@ -109,6 +109,8 @@ export function setupMockGalaxy(): void {
       toggleShaderPack: async () => true,
       deleteShaderPack: async () => true,
       openExternal: async () => true,
+      openInstanceFolder: async () => {},
+      openInstancesRootDir: async () => {},
       getWorldSaves: async () => [
         { folderName: 'Cosmic Survival', name: 'Cosmic Survival', lastPlayed: Date.now() - 3600000, sizeBytes: 1024 * 1024 * 24, gameMode: 'Survival' }
       ],
@@ -135,13 +137,12 @@ export function setupMockGalaxy(): void {
           memoryMin: 2048,
           memoryMax: 6144,
           jvmProfile: 'aikar',
-          resolution: { width: 1920, height: 1080, fullscreen: false },
+          resolution: { width: 1920, height: 1080, fullscreen: true },
           isRunning: false
         };
         mockInstances.push(inst);
         return inst;
       },
-      openInstanceFolder: async () => {},
 
       getMojangVersions: async () => [
         { id: '1.21.4', type: 'release', url: '', time: '', releaseTime: '' },
@@ -255,7 +256,7 @@ export function setupMockGalaxy(): void {
           launchCount: 0,
           memoryMin: 2048,
           memoryMax: 4096,
-          resolution: { width: 1920, height: 1080, fullscreen: false }
+          resolution: { width: 1920, height: 1080, fullscreen: true }
         };
         mockInstances.push(newInst);
         return newInst;

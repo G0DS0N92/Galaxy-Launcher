@@ -223,3 +223,20 @@
   );
   background-size: 200% 100%;
 }
+
+/* Celestial Moon Float & Glow Animation */
+@keyframes celestial-float {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg) scale(1);
+    filter: drop-shadow(0 0 6px rgba(165, 180, 252, 0.6));
+  }
+  50% {
+    transform: translateY(-2.5px) rotate(-8deg) scale(1.06);
+    filter: drop-shadow(0 0 14px rgba(165, 180, 252, 0.95));
+  }
+}
+
+.animate-celestial-moon {
+  animation: celestial-float 3.5s ease-in-out infinite;
+}
+

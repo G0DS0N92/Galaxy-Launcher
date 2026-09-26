@@ -44,7 +44,7 @@ export class InstanceManager {
               } catch {}
               continue;
             }
-            inst.resolution = inst.resolution || { width: 1280, height: 720, fullscreen: false };
+            inst.resolution = inst.resolution || { width: 1920, height: 1080, fullscreen: true };
             inst.icon = inst.icon || 'grass_block';
             inst.iconBackground = inst.iconBackground || 'obsidian';
             inst.memoryMax = inst.memoryMax || 4096;
@@ -128,7 +128,7 @@ export class InstanceManager {
       resolution: options.resolution || {
         width: 1920,
         height: 1080,
-        fullscreen: false
+        fullscreen: true
       },
       createdAt: new Date().toISOString()
     };

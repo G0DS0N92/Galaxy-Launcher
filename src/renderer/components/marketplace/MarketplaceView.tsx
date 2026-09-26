@@ -293,8 +293,8 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 
   return (
     <div className="min-h-full p-6 space-y-6 select-none max-w-[1600px] mx-auto">
-      {/* 1. HERO HEADER BANNER (Matching media_1790255383348.jpg) */}
-      <div className="relative rounded-3xl overflow-hidden border border-white/[0.1] shadow-2xl h-56 md:h-64 group">
+      {/* 1. HERO HEADER BANNER (Matching standard banner dimensions) */}
+      <div className="w-full relative rounded-3xl overflow-hidden border border-white/[0.1] shadow-2xl h-[200px] sm:h-[215px] lg:h-[225px] xl:h-[235px] group shrink-0">
         <img
           src={bgPortalHero}
           alt="Discover Banner"

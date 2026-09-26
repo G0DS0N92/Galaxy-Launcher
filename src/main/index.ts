@@ -20,6 +20,34 @@ import { LauncherSettings, ModLoader } from '../preload/types';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Persistent debug logging
+const debugLogFile = path.join(app.getPath('userData'), 'launcher_debug.log');
+function logToFile(...args: any[]) {
+  const line = `[${new Date().toISOString()}] [PID: ${process.pid}] ${args.map(a => {
+    if (a instanceof Error) return `${a.name}: ${a.message}\n${a.stack}`;
+    if (typeof a === 'object' && a !== null) {
+      try { return JSON.stringify(a); } catch { return String(a); }
+    }
+    return String(a);
+  }).join(' ')}\n`;
+  try {
+    fs.appendFileSync(debugLogFile, line);
+  } catch {}
+}
+const origLog = console.log;
+const origErr = console.error;
+const origWarn = console.warn;
+console.log = (...args) => { logToFile('[INFO]', ...args); origLog(...args); };
+console.error = (...args) => { logToFile('[ERROR]', ...args); origErr(...args); };
+console.warn = (...args) => { logToFile('[WARN]', ...args); origWarn(...args); };
+
+logToFile('[Main] Startup initiated, PID:', process.pid, 'execPath:', process.execPath);
+
+app.on('will-quit', () => logToFile('[Main] app event: will-quit'));
+app.on('before-quit', (e) => logToFile('[Main] app event: before-quit, defaultPrevented:', e.defaultPrevented));
+app.on('quit', (_e, code) => logToFile('[Main] app event: quit with code:', code));
+process.on('exit', (code) => logToFile('[Main] process event: exit with code:', code));
+
 // Register custom galaxy-file protocol for fast secure local asset/screenshot loading
 protocol.registerSchemesAsPrivileged([
   { scheme: 'galaxy-file', privileges: { standard: true, secure: true, supportFetchAPI: true, bypassCSP: true } }
@@ -42,16 +70,27 @@ const appStartupTime = Date.now();
 
 // Ensure single instance
 const gotTheLock = app.requestSingleInstanceLock();
+logToFile('[Main] gotTheLock:', gotTheLock);
 if (!gotTheLock) {
+  logToFile('[Main] Another instance already holds lock, exiting immediately.');
   app.quit();
+  process.exit(0);
 } else {
   app.on('second-instance', () => {
-    if (mainWindow) {
+    logToFile('[Main] second-instance triggered');
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      logToFile('[Main] mainWindow is null or destroyed, recreating window');
+      createWindow();
+    } else {
+      logToFile('[Main] mainWindow exists, restoring and focusing');
       if (mainWindow.isMinimized()) mainWindow.restore();
+      if (!mainWindow.isVisible()) mainWindow.show();
       mainWindow.show();
       mainWindow.setAlwaysOnTop(true);
       mainWindow.focus();
       mainWindow.setAlwaysOnTop(false);
+      // Automatically refresh live UI when launcher icon is clicked again
+      mainWindow.webContents.reload();
     }
   });
 }
@@ -90,22 +129,23 @@ function getSavedSettings(): LauncherSettings {
     defaultRamMax: 4096,
     defaultResolutionWidth: 1920,
     defaultResolutionHeight: 1080,
-    defaultFullscreen: false,
+    defaultFullscreen: true,
     autoCheckUpdates: true,
     updateChannel: 'stable',
     instancesDirectory: instancesDir,
-    minimizeToTray: true,
-    closeToTray: true,
+    minimizeToTray: false,
+    closeToTray: false,
     startupAnimation: true
   };
 
   try {
     if (fs.existsSync(settingsFile)) {
       const raw = fs.readFileSync(settingsFile, 'utf-8');
-      return { ...defaultSettings, ...JSON.parse(raw) };
+      const clean = raw.replace(/^\uFEFF/, '').trim();
+      return { ...defaultSettings, ...JSON.parse(clean) };
     }
-  } catch (err) {
-    console.error('Failed to read settings:', err);
+  } catch (err: any) {
+    console.error('Failed to read settings:', err?.message || err);
   }
   return defaultSettings;
 }
@@ -183,29 +223,62 @@ async function createWindow() {
     console.error('Window failed to load:', errorCode, errorDesc, validatedURL);
   });
 
-  // Load URL or build file
-  if (process.env.VITE_DEV_SERVER_URL) {
-    mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
-  } else {
-    const candidates = [
-      path.join(app.getAppPath(), 'dist/index.html'),
-      path.join(__dirname, '../../dist/index.html'),
-      path.join(__dirname, '../renderer/index.html'),
-      path.join(__dirname, 'index.html')
-    ];
-    let loaded = false;
-    for (const htmlPath of candidates) {
-      if (fs.existsSync(htmlPath)) {
-        console.log('Loading UI from:', htmlPath);
-        mainWindow.loadFile(htmlPath);
-        loaded = true;
-        break;
+  const loadMainHTML = () => {
+    if (process.env.VITE_DEV_SERVER_URL) {
+      mainWindow?.loadURL(process.env.VITE_DEV_SERVER_URL);
+    } else {
+      const candidates = [
+        path.join(app.getAppPath(), 'dist/index.html'),
+        path.join(__dirname, '../../dist/index.html'),
+        path.join(__dirname, '../renderer/index.html')
+      ];
+      let loaded = false;
+      for (const htmlPath of candidates) {
+        if (fs.existsSync(htmlPath)) {
+          console.log('[Main] Loading UI from:', htmlPath);
+          mainWindow?.loadFile(htmlPath);
+          loaded = true;
+          break;
+        }
+      }
+      if (!loaded) {
+        mainWindow?.loadFile('dist/index.html');
       }
     }
-    if (!loaded) {
-      mainWindow.loadFile(path.join(app.getAppPath(), 'dist/index.html'));
+  };
+
+  // Enable hot reload via F5 / Ctrl+R and DevTools toggle with F12 / Ctrl+Shift+I
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.type === 'keyDown') {
+      if (input.key === 'F5' || ((input.control || input.meta) && input.key.toLowerCase() === 'r')) {
+        event.preventDefault();
+        console.log('[Main] Reloading live launcher UI...');
+        mainWindow?.webContents.reload();
+      } else if (input.key === 'F12' || (input.control && input.shift && input.key.toLowerCase() === 'i')) {
+        event.preventDefault();
+        mainWindow?.webContents.toggleDevTools();
+      }
     }
-  }
+  });
+
+  // Explicitly ensure the window is shown and focused when ready
+  mainWindow.once('ready-to-show', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+
+  mainWindow.webContents.on('did-finish-load', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+
+  // Initial load
+  loadMainHTML();
 
   // Open external links in default browser
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -213,13 +286,24 @@ async function createWindow() {
     return { action: 'deny' };
   });
 
-  // Minimize to tray on close (if closeToTray setting is active)
+  // Minimize to tray on close (only if closeToTray setting is active AND system tray is active)
   mainWindow.on('close', (e) => {
     const settings = getSavedSettings();
-    if (!trayManager.isAppQuitting() && settings.closeToTray) {
+    if (!trayManager.isAppQuitting() && settings.closeToTray && trayManager.hasValidTray()) {
       e.preventDefault();
+      logToFile('[Main] mainWindow close intercepted, hiding to tray');
       mainWindow?.hide();
+    } else {
+      logToFile('[Main] mainWindow closing completely');
     }
+  });
+
+  mainWindow.on('closed', () => {
+    logToFile('[Main] mainWindow closed event fired');
+    mainWindow = null;
+    updateManager.setMainWindow(null);
+    achievementsManager.setMainWindow(null);
+    cloudService.setMainWindow(null);
   });
 
   updateManager.setMainWindow(mainWindow);
@@ -231,15 +315,61 @@ async function createWindow() {
   cloudService.setMainWindow(mainWindow);
 }
 
+const GALAXY_MIME_TYPES: Record<string, string> = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.gif': 'image/gif',
+  '.svg': 'image/svg+xml',
+  '.bmp': 'image/bmp'
+};
+
 app.whenReady().then(async () => {
   // Protocol handler for secure local screenshot previews
   try {
-    protocol.handle('galaxy-file', (request) => {
+    protocol.handle('galaxy-file', async (request) => {
       try {
-        const urlStr = request.url.replace(/^galaxy-file:\/\//, '');
-        const decodedPath = decodeURIComponent(urlStr);
-        return net.fetch(`file:///${decodedPath.replace(/^file:\/\/\/?/, '')}`);
+        let filePath = '';
+        try {
+          const parsed = new URL(request.url);
+          const queryPath = parsed.searchParams.get('path');
+          if (queryPath) {
+            filePath = queryPath;
+          } else {
+            let raw = parsed.pathname;
+            if (/^\/[a-zA-Z]:/i.test(raw)) {
+              raw = raw.slice(1);
+            } else if (parsed.host && /^[a-zA-Z]:$/i.test(parsed.host)) {
+              raw = parsed.host + raw;
+            }
+            filePath = decodeURIComponent(raw);
+          }
+        } catch {
+          let raw = request.url.replace(/^galaxy-file:\/\/(image\?path=)?/i, '');
+          if (/^\/[a-zA-Z]:/i.test(raw)) {
+            raw = raw.slice(1);
+          }
+          filePath = decodeURIComponent(raw);
+        }
+
+        const cleanPath = path.normalize(filePath);
+        if (!cleanPath || !fs.existsSync(cleanPath)) {
+          return new Response('File not found', { status: 404 });
+        }
+        const buffer = await fs.promises.readFile(cleanPath);
+        const ext = path.extname(cleanPath).toLowerCase();
+        const contentType = GALAXY_MIME_TYPES[ext] || 'image/png';
+        return new Response(buffer, {
+          status: 200,
+          headers: {
+            'Content-Type': contentType,
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Access-Control-Allow-Origin': '*'
+          }
+        });
       } catch (e) {
+        console.error('[galaxy-file protocol error]', e);
         return new Response('Not found', { status: 404 });
       }
     });
@@ -326,8 +456,13 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
-  if (trayManager.isAppQuitting()) {
+  const settings = getSavedSettings();
+  if (settings.closeToTray && trayManager.hasValidTray() && !trayManager.isAppQuitting()) {
+    logToFile('[Main] window-all-closed: remaining active in tray');
+  } else {
+    logToFile('[Main] window-all-closed: quitting app cleanly');
     if (process.platform !== 'darwin') {
+      trayManager.destroy();
       app.quit();
     }
   }
@@ -380,8 +515,19 @@ function setupIpcHandlers() {
   });
   ipcMain.handle('instances:getWorldSaves', async (_, id) => instanceManager.getWorldSaves(id));
   ipcMain.handle('instances:openFolder', async (_, id, subDir?: string) => {
+    if (!id || id === 'root') {
+      const target = instanceManager.getInstancesDir();
+      fs.mkdirSync(target, { recursive: true });
+      shell.openPath(target);
+      return;
+    }
     const instPath = instanceManager.getInstancePath(id);
     const target = subDir ? path.join(instPath, subDir) : instPath;
+    fs.mkdirSync(target, { recursive: true });
+    shell.openPath(target);
+  });
+  ipcMain.handle('instances:openRootDir', async () => {
+    const target = instanceManager.getInstancesDir();
     fs.mkdirSync(target, { recursive: true });
     shell.openPath(target);
   });

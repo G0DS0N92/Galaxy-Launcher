@@ -85,6 +85,15 @@ export const App: React.FC = () => {
   useEffect(() => {
     loadInitialData();
     setupEventListeners();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'F5' || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'r')) {
+        e.preventDefault();
+        window.location.reload();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   const loadInitialData = async () => {
@@ -420,6 +429,11 @@ export const App: React.FC = () => {
     memoryMax?: number;
     optimize?: boolean;
     jvmProfile?: any;
+    resolution?: {
+      width: number;
+      height: number;
+      fullscreen: boolean;
+    };
   }) => {
     const newInst = await window.galaxy.createInstance(data);
     if (data.optimize) {
@@ -486,7 +500,7 @@ export const App: React.FC = () => {
         />
 
         {/* Dynamic Viewport */}
-        <main className="flex-1 h-full flex flex-col overflow-hidden relative">
+        <main className="flex-1 h-[calc(100vh-2.75rem)] overflow-y-auto custom-scrollbar relative flex flex-col">
           {inspectingInstance ? (
             <InstanceDetailView
               instance={inspectingInstance}

@@ -23,3 +23,8 @@ Thumbs.db
 *.log
 .vscode/
 .idea/
+
+# Environment and secrets
+.env
+.env.*
+

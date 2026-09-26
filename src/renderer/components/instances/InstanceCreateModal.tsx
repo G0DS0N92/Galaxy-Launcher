@@ -41,6 +41,11 @@ interface InstanceCreateModalProps {
     memoryMax?: number;
     optimize?: boolean;
     jvmProfile?: JvmProfile;
+    resolution?: {
+      width: number;
+      height: number;
+      fullscreen: boolean;
+    };
   }) => Promise<void>;
   onImportSuccess?: (instance: Instance) => void;
   detectedJava: JavaInstallation[];
@@ -273,7 +278,12 @@ export const InstanceCreateModal: React.FC<InstanceCreateModalProps> = ({
         memoryMin: 2048,
         memoryMax,
         optimize,
-        jvmProfile
+        jvmProfile,
+        resolution: {
+          width: 1920,
+          height: 1080,
+          fullscreen: true
+        }
       });
       onClose();
     } catch (err) {

@@ -43,6 +43,11 @@ const galaxyApi = {
     memoryMax?: number;
     jvmArgs?: string;
     javaPath?: string;
+    resolution?: {
+      width: number;
+      height: number;
+      fullscreen: boolean;
+    };
   }): Promise<Instance> => ipcRenderer.invoke('instances:create', options),
   updateInstance: (inst: Instance): Promise<Instance> => ipcRenderer.invoke('instances:update', inst),
   deleteInstance: (id: string): Promise<boolean> => ipcRenderer.invoke('instances:delete', id),
@@ -62,6 +67,7 @@ const galaxyApi = {
   openExternal: (url: string): Promise<boolean> => ipcRenderer.invoke('shell:openExternal', url),
   getWorldSaves: (id: string): Promise<WorldSave[]> => ipcRenderer.invoke('instances:getWorldSaves', id),
   openInstanceFolder: (id: string, subDir?: string): Promise<void> => ipcRenderer.invoke('instances:openFolder', id, subDir),
+  openInstancesRootDir: (): Promise<void> => ipcRenderer.invoke('instances:openRootDir'),
   createWorldBackup: (id: string, worldFolderName: string): Promise<any> => ipcRenderer.invoke('instances:createWorldBackup', id, worldFolderName),
   listWorldBackups: (id: string): Promise<any[]> => ipcRenderer.invoke('instances:listWorldBackups', id),
   restoreWorldBackup: (id: string, backupFilename: string): Promise<boolean> => ipcRenderer.invoke('instances:restoreWorldBackup', id, backupFilename),
