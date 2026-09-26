@@ -171,7 +171,15 @@ async function syncToGitHub() {
   const newCommitRes = await ghRequest(`/repos/${owner}/${repo}/git/commits`, 'POST', {
     message: commitMsg,
     tree: newTreeSha,
-    parents: [latestCommitSha]
+    parents: [latestCommitSha],
+    author: {
+      name: 'GODSON92',
+      email: 'godson0920@gmail.com'
+    },
+    committer: {
+      name: 'GODSON92',
+      email: 'godson0920@gmail.com'
+    }
   });
 
   if (newCommitRes.status !== 201) {

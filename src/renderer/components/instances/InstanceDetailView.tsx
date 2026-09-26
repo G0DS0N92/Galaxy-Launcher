@@ -1949,7 +1949,7 @@ export const InstanceDetailView: React.FC<InstanceDetailViewProps> = ({
   const currentBannerConfig = TAB_BANNER_CONFIG[activeTab] || TAB_BANNER_CONFIG.content;
 
   return (
-    <div className="w-full min-h-full pb-10 p-4 sm:p-5 lg:p-5 flex flex-col gap-3 sm:gap-3.5 select-none font-sans">
+    <div className={`w-full ${activeTab === 'settings' ? 'h-full pb-2' : 'min-h-full pb-10'} p-4 sm:p-5 lg:p-5 flex flex-col gap-3 sm:gap-3.5 select-none font-sans`}>
       {/* ========================================================================= */}
       {/* HERO BANNER CARD — Unified panoramic banner with dedicated subpage artwork */}
       {/* ========================================================================= */}
@@ -3628,7 +3628,7 @@ export const InstanceDetailView: React.FC<InstanceDetailViewProps> = ({
         })()}
 
         {/* ----------------------------------------------------------------------- */}
-        {/* SETTINGS TAB (Redesigned with comfortable sizing, matching Image 2) */}
+        {/* SETTINGS TAB (Redesigned matching reference image) */}
         {/* ----------------------------------------------------------------------- */}
         {activeTab === 'settings' && (() => {
           const isCard1Active = false;
@@ -3639,38 +3639,38 @@ export const InstanceDetailView: React.FC<InstanceDetailViewProps> = ({
           const ramPercent = Math.min(100, Math.max(0, ((memoryMax - 1024) / (16384 - 1024)) * 100));
 
           return (
-            <div className="relative w-full flex-1 min-h-0 flex flex-col justify-between gap-2.5 sm:gap-3 pb-0.5 animate-in fade-in duration-200">
+            <div className="relative w-full flex-1 min-h-0 flex flex-col justify-between gap-3 sm:gap-3.5 pb-0.5 animate-in fade-in duration-200">
               {/* ROW 1: INSTANCE IDENTITY & MINECRAFT CONFIGURATION */}
-              <div className={`flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-2.5 sm:gap-3 lg:gap-3.5 relative items-stretch ${openDropdown && (isCard1Active || isCard2Active) ? 'z-40' : 'z-20'}`}>
+              <div className={`flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-3.5 lg:gap-4 relative items-stretch ${openDropdown && (isCard1Active || isCard2Active) ? 'z-40' : 'z-20'}`}>
                 {/* 1. INSTANCE IDENTITY */}
-                <div className="p-4 sm:p-4.5 rounded-2xl bg-[#0c1026]/90 backdrop-blur-xl border border-white/[0.08] shadow-lg flex flex-col justify-between min-h-[148px] relative z-10">
+                <div className="p-4 sm:p-5 rounded-2xl bg-[#0c102a]/85 backdrop-blur-xl border border-white/[0.08] shadow-[0_8px_30px_rgba(0,0,0,0.45)] flex flex-col justify-between min-h-[148px] relative z-10">
                   <div className="flex items-center space-x-3 shrink-0">
-                    <div className="w-8 h-8 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
-                      <LayoutGrid className="w-4 h-4" />
+                    <div className="w-9 h-9 rounded-xl bg-blue-500/15 border border-blue-500/25 flex items-center justify-center text-blue-400 shrink-0 shadow-sm">
+                      <LayoutGrid className="w-4.5 h-4.5" />
                     </div>
                     <div>
-                      <h3 className="text-[13px] font-bold text-white leading-tight">Instance Identity</h3>
-                      <p className="text-[11px] text-slate-400 leading-tight">Customize your instance name, icon and appearance.</p>
+                      <h3 className="text-sm font-bold text-white tracking-wide">Instance Identity</h3>
+                      <p className="text-xs text-slate-400 mt-0.5">Customize your instance name, icon and appearance.</p>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end my-auto pt-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5 items-end my-auto pt-2">
                     {/* Instance Name */}
                     <div className="sm:col-span-7">
-                      <label className="block text-[11px] font-semibold text-slate-300 mb-1.5">Instance Name</label>
+                      <label className="block text-xs font-semibold text-slate-300 mb-1.5">Instance Name</label>
                       <input
                         type="text"
                         value={instName}
                         onChange={(e) => setInstName(e.target.value)}
-                        className="w-full h-11 px-3.5 rounded-xl bg-[#090b16] border border-white/[0.08] focus:border-blue-500 text-xs font-medium text-white transition-colors"
+                        className="w-full h-11 px-3.5 rounded-xl bg-[#080b1e] border border-white/[0.08] focus:border-blue-500 text-xs sm:text-sm font-medium text-white transition-colors focus:outline-none"
                         placeholder="Instance Name"
                       />
                     </div>
 
                     {/* Instance Icon */}
                     <div className="sm:col-span-5">
-                      <label className="block text-[11px] font-semibold text-slate-300 mb-1.5">Instance Icon</label>
-                      <div className="flex items-center space-x-2">
+                      <label className="block text-xs font-semibold text-slate-300 mb-1.5">Instance Icon</label>
+                      <div className="flex items-center space-x-2.5">
                         <div
                           onClick={() => { sounds.playClick(); setShowIconModal(true); }}
                           className="relative w-11 h-11 rounded-xl overflow-hidden border border-white/20 shadow-md bg-black/40 shrink-0 cursor-pointer group hover:border-cyan-400 transition-colors"
@@ -3688,9 +3688,9 @@ export const InstanceDetailView: React.FC<InstanceDetailViewProps> = ({
                             sounds.playClick();
                             setShowIconModal(true);
                           }}
-                          className="h-11 px-3.5 rounded-xl bg-[#090b16] hover:bg-white/[0.08] border border-white/[0.08] hover:border-white/[0.15] text-xs font-semibold text-slate-200 hover:text-white flex items-center space-x-2 transition-all shrink-0 cursor-pointer"
+                          className="h-11 px-3.5 rounded-xl bg-[#080b1e] hover:bg-white/[0.08] border border-white/[0.08] hover:border-white/[0.15] text-xs font-semibold text-slate-200 hover:text-white flex items-center space-x-2 transition-all shrink-0 cursor-pointer"
                         >
-                          <Palette className="w-3.5 h-3.5 text-cyan-400" />
+                          <Image className="w-3.5 h-3.5 text-cyan-400" />
                           <span>Change Icon</span>
                         </button>
                       </div>
@@ -3699,30 +3699,30 @@ export const InstanceDetailView: React.FC<InstanceDetailViewProps> = ({
                 </div>
 
                 {/* 2. MINECRAFT CONFIGURATION */}
-                <div className={`p-4 sm:p-4.5 rounded-2xl bg-[#0c1026]/90 backdrop-blur-xl border border-white/[0.08] shadow-lg flex flex-col justify-between min-h-[148px] relative ${isCard2Active ? 'z-50' : 'z-10'}`}>
+                <div className={`p-4 sm:p-5 rounded-2xl bg-[#0c102a]/85 backdrop-blur-xl border border-white/[0.08] shadow-[0_8px_30px_rgba(0,0,0,0.45)] flex flex-col justify-between min-h-[148px] relative ${isCard2Active ? 'z-50' : 'z-10'}`}>
                   <div className="flex items-center space-x-3 shrink-0">
-                    <div className="w-8 h-8 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
-                      <Box className="w-4 h-4" />
+                    <div className="w-9 h-9 rounded-xl bg-blue-500/15 border border-blue-500/25 flex items-center justify-center text-blue-400 shrink-0 shadow-sm">
+                      <Box className="w-4.5 h-4.5" />
                     </div>
                     <div>
-                      <h3 className="text-[13px] font-bold text-white leading-tight">Minecraft Configuration</h3>
-                      <p className="text-[11px] text-slate-400 leading-tight">Select the Minecraft version and loader for this instance.</p>
+                      <h3 className="text-sm font-bold text-white tracking-wide">Minecraft Configuration</h3>
+                      <p className="text-xs text-slate-400 mt-0.5">Select the Minecraft version and loader for this instance.</p>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3.5 my-auto pt-1">
+                  <div className="grid grid-cols-2 gap-3.5 my-auto pt-2">
                     {/* Minecraft Version */}
                     <div data-dropdown-container="true">
-                      <label className="block text-[11px] font-semibold text-slate-300 mb-1.5">Minecraft Version</label>
+                      <label className="block text-xs font-semibold text-slate-300 mb-1.5">Minecraft Version</label>
                       <div className="relative" data-dropdown-container="true">
                         <button
                           type="button"
                           onClick={() => { sounds.playClick(); setOpenDropdown(openDropdown === 'version' ? null : 'version'); }}
-                          className="w-full h-11 px-3.5 rounded-xl bg-[#090b16] border border-white/[0.08] hover:border-white/[0.15] text-xs text-white flex items-center justify-between transition-all cursor-pointer"
+                          className="w-full h-11 px-3.5 rounded-xl bg-[#080b1e] border border-white/[0.08] hover:border-white/[0.15] text-xs sm:text-sm text-white flex items-center justify-between transition-all cursor-pointer"
                         >
                           <div className="flex items-center space-x-2.5 min-w-0 flex-1 pr-2">
                             <GrassBlockIcon className="w-5 h-5 shrink-0" />
-                            <span className="font-semibold text-slate-100 text-xs truncate">
+                            <span className="font-semibold text-slate-100 text-xs sm:text-sm truncate">
                               {mcVersion || instance.version || '1.20.1'}
                             </span>
                           </div>
@@ -3731,7 +3731,6 @@ export const InstanceDetailView: React.FC<InstanceDetailViewProps> = ({
 
                         {openDropdown === 'version' && (
                           <div data-dropdown-container="true" className="absolute top-full left-0 right-0 mt-2 z-50 rounded-xl bg-[#0b0f24] border border-white/[0.15] shadow-[0_16px_45px_rgba(0,0,0,0.95)] backdrop-blur-2xl overflow-hidden flex flex-col max-h-64">
-                            {/* Search bar inside version dropdown */}
                             <div className="p-2.5 border-b border-white/[0.08] bg-black/20 shrink-0">
                               <div className="relative">
                                 <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -3778,16 +3777,16 @@ export const InstanceDetailView: React.FC<InstanceDetailViewProps> = ({
 
                     {/* Loader */}
                     <div data-dropdown-container="true">
-                      <label className="block text-[11px] font-semibold text-slate-300 mb-1.5">Loader</label>
+                      <label className="block text-xs font-semibold text-slate-300 mb-1.5">Loader</label>
                       <div className="relative" data-dropdown-container="true">
                         <button
                           type="button"
                           onClick={() => { sounds.playClick(); setOpenDropdown(openDropdown === 'loader' ? null : 'loader'); }}
-                          className="w-full h-11 px-3.5 rounded-xl bg-[#090b16] border border-white/[0.08] hover:border-white/[0.15] text-xs text-white flex items-center justify-between transition-all capitalize cursor-pointer"
+                          className="w-full h-11 px-3.5 rounded-xl bg-[#080b1e] border border-white/[0.08] hover:border-white/[0.15] text-xs sm:text-sm text-white flex items-center justify-between transition-all capitalize cursor-pointer"
                         >
                           <div className="flex items-center space-x-2.5 truncate">
                             <Scroll className="w-4 h-4 text-amber-200/90" />
-                            <span className="font-semibold text-slate-100">{loader}</span>
+                            <span className="font-semibold text-slate-100 text-xs sm:text-sm">{loader}</span>
                           </div>
                           <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${openDropdown === 'loader' ? 'rotate-180 text-blue-400' : ''}`} />
                         </button>
@@ -3825,25 +3824,25 @@ export const InstanceDetailView: React.FC<InstanceDetailViewProps> = ({
               </div>
 
               {/* ROW 2: MEMORY & PERFORMANCE & DISPLAY SETTINGS */}
-              <div className={`flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-2.5 sm:gap-3 lg:gap-3.5 relative items-stretch ${openDropdown && (isCard3Active || isCard4Active) ? 'z-30' : 'z-10'}`}>
+              <div className={`flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-3.5 lg:gap-4 relative items-stretch ${openDropdown && (isCard3Active || isCard4Active) ? 'z-30' : 'z-10'}`}>
                 {/* 3. MEMORY & PERFORMANCE */}
-                <div className={`p-4 sm:p-4.5 rounded-2xl bg-[#0c1026]/90 backdrop-blur-xl border border-white/[0.08] shadow-lg flex flex-col justify-between min-h-[148px] relative ${isCard3Active ? 'z-50' : 'z-10'}`}>
+                <div className={`p-4 sm:p-5 rounded-2xl bg-[#0c102a]/85 backdrop-blur-xl border border-white/[0.08] shadow-[0_8px_30px_rgba(0,0,0,0.45)] flex flex-col justify-between min-h-[148px] relative ${isCard3Active ? 'z-50' : 'z-10'}`}>
                   <div className="flex items-center space-x-3 shrink-0">
-                    <div className="w-8 h-8 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
-                      <Cpu className="w-4 h-4" />
+                    <div className="w-9 h-9 rounded-xl bg-blue-500/15 border border-blue-500/25 flex items-center justify-center text-blue-400 shrink-0 shadow-sm">
+                      <Cpu className="w-4.5 h-4.5" />
                     </div>
                     <div>
-                      <h3 className="text-[13px] font-bold text-white leading-tight">Memory &amp; Performance</h3>
-                      <p className="text-[11px] text-slate-400 leading-tight">Allocate memory and configure performance settings.</p>
+                      <h3 className="text-sm font-bold text-white tracking-wide">Memory &amp; Performance</h3>
+                      <p className="text-xs text-slate-400 mt-0.5">Allocate memory and configure performance settings.</p>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center my-auto pt-1">
-                    {/* RAM Slider (Fat & polished track with clear white/cyan thumb) */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center my-auto pt-2">
+                    {/* RAM Slider */}
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-xs">
-                        <span className="font-semibold text-slate-300 text-[11px]">RAM Allocation</span>
-                        <span className="font-bold text-cyan-400 text-xs sm:text-[13px]">
+                        <span className="font-semibold text-slate-300 text-xs">RAM Allocation</span>
+                        <span className="font-bold text-cyan-400 text-xs sm:text-sm">
                           {Math.round(memoryMax / 1024)} GB
                         </span>
                       </div>
@@ -3865,7 +3864,7 @@ export const InstanceDetailView: React.FC<InstanceDetailViewProps> = ({
                           }}
                         />
                       </div>
-                      <div className="flex items-center justify-between text-[11px] text-slate-400 font-medium">
+                      <div className="flex items-center justify-between text-xs text-slate-400 font-medium">
                         <span>1 GB</span>
                         <span>16 GB</span>
                       </div>
@@ -3873,16 +3872,16 @@ export const InstanceDetailView: React.FC<InstanceDetailViewProps> = ({
 
                     {/* Performance Preset */}
                     <div data-dropdown-container="true">
-                      <label className="block text-[11px] font-semibold text-slate-300 mb-1.5">Performance Preset</label>
+                      <label className="block text-xs font-semibold text-slate-300 mb-1.5">Performance Preset</label>
                       <div className="relative" data-dropdown-container="true">
                         <button
                           type="button"
                           onClick={() => { sounds.playClick(); setOpenDropdown(openDropdown === 'preset' ? null : 'preset'); }}
-                          className="w-full h-11 px-3.5 rounded-xl bg-[#090b16] border border-white/[0.08] hover:border-white/[0.15] text-xs text-white flex items-center justify-between transition-all cursor-pointer"
+                          className="w-full h-11 px-3.5 rounded-xl bg-[#080b1e] border border-white/[0.08] hover:border-white/[0.15] text-xs sm:text-sm text-white flex items-center justify-between transition-all cursor-pointer"
                         >
                           <div className="flex items-center space-x-2 truncate">
                             <Zap className="w-4 h-4 text-amber-400 fill-amber-400 shrink-0" />
-                            <span className="font-semibold text-slate-100 truncate text-xs">
+                            <span className="font-semibold text-slate-100 truncate text-xs sm:text-sm">
                               {perfPreset === 'balanced' && 'Balanced (Recommended)'}
                               {perfPreset === 'high' && 'High Performance'}
                               {perfPreset === 'extreme' && 'Extreme (12GB+)'}
@@ -3924,7 +3923,7 @@ export const InstanceDetailView: React.FC<InstanceDetailViewProps> = ({
                           </div>
                         )}
                       </div>
-                      <p className="text-[11px] text-slate-400 mt-1.5 leading-tight truncate">
+                      <p className="text-xs text-slate-400 mt-1.5 leading-tight truncate">
                         {perfPreset === 'extreme' && '12GB heavy allocation for high-end PCs & shaders.'}
                         {perfPreset === 'high' && '8GB allocation for modpacks & shaders.'}
                         {perfPreset === 'balanced' && 'A balanced setup for stable performance and smooth gameplay.'}
@@ -3935,30 +3934,30 @@ export const InstanceDetailView: React.FC<InstanceDetailViewProps> = ({
                 </div>
 
                 {/* 4. DISPLAY SETTINGS */}
-                <div className={`p-4 sm:p-4.5 rounded-2xl bg-[#0c1026]/90 backdrop-blur-xl border border-white/[0.08] shadow-lg flex flex-col justify-between min-h-[148px] relative ${isCard4Active ? 'z-50' : 'z-10'}`}>
+                <div className={`p-4 sm:p-5 rounded-2xl bg-[#0c102a]/85 backdrop-blur-xl border border-white/[0.08] shadow-[0_8px_30px_rgba(0,0,0,0.45)] flex flex-col justify-between min-h-[148px] relative ${isCard4Active ? 'z-50' : 'z-10'}`}>
                   <div className="flex items-center space-x-3 shrink-0">
-                    <div className="w-8 h-8 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
-                      <Monitor className="w-4 h-4" />
+                    <div className="w-9 h-9 rounded-xl bg-blue-500/15 border border-blue-500/25 flex items-center justify-center text-blue-400 shrink-0 shadow-sm">
+                      <Monitor className="w-4.5 h-4.5" />
                     </div>
                     <div>
-                      <h3 className="text-[13px] font-bold text-white leading-tight">Display Settings</h3>
-                      <p className="text-[11px] text-slate-400 leading-tight">Configure game window and display options.</p>
+                      <h3 className="text-sm font-bold text-white tracking-wide">Display Settings</h3>
+                      <p className="text-xs text-slate-400 mt-0.5">Configure game window and display options.</p>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center my-auto pt-1">
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center my-auto pt-2">
                     {/* Default Resolution */}
-                    <div data-dropdown-container="true">
-                      <label className="block text-[11px] font-semibold text-slate-300 mb-1.5">Default Resolution</label>
+                    <div className="md:col-span-7" data-dropdown-container="true">
+                      <label className="block text-xs font-semibold text-slate-300 mb-1.5">Default Resolution</label>
                       <div className="relative" data-dropdown-container="true">
                         <button
                           type="button"
                           onClick={() => { sounds.playClick(); setOpenDropdown(openDropdown === 'resolution' ? null : 'resolution'); }}
-                          className="w-full h-11 px-3.5 rounded-xl bg-[#090b16] border border-white/[0.08] hover:border-white/[0.15] text-xs text-white flex items-center justify-between transition-all cursor-pointer"
+                          className="w-full h-11 px-3.5 rounded-xl bg-[#080b1e] border border-white/[0.08] hover:border-white/[0.15] text-xs sm:text-sm text-white flex items-center justify-between transition-all cursor-pointer"
                         >
                           <div className="flex items-center space-x-2 truncate">
                             <Monitor className="w-4 h-4 text-slate-400" />
-                            <span className="font-semibold text-slate-100 truncate text-xs">{resPreset}</span>
+                            <span className="font-semibold text-slate-100 truncate text-xs sm:text-sm">{resPreset}</span>
                           </div>
                           <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform shrink-0 ${openDropdown === 'resolution' ? 'rotate-180 text-blue-400' : ''}`} />
                         </button>
@@ -3984,13 +3983,13 @@ export const InstanceDetailView: React.FC<InstanceDetailViewProps> = ({
                           </div>
                         )}
                       </div>
-                      <p className="text-[11px] text-slate-400 mt-1.5 leading-tight">
+                      <p className="text-xs text-slate-400 mt-1.5 leading-tight">
                         This will be used when launching the game.
                       </p>
                     </div>
 
                     {/* Toggles */}
-                    <div className="space-y-2">
+                    <div className="md:col-span-5 space-y-2.5">
                       {/* Fullscreen (Default ON) */}
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-medium text-slate-200">Fullscreen</span>
@@ -4058,28 +4057,28 @@ export const InstanceDetailView: React.FC<InstanceDetailViewProps> = ({
               </div>
 
               {/* ROW 3: JAVA RUNTIME & LAUNCH OPTIONS / BACKUP */}
-              <div className={`flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-2.5 sm:gap-3 lg:gap-3.5 relative items-stretch ${openDropdown && isCard6Active ? 'z-30' : 'z-10'}`}>
-                {/* 5. JAVA RUNTIME (With Authentic Java Logo & Galaxy Selection Modal trigger) */}
-                <div className="p-4 sm:p-4.5 rounded-2xl bg-[#0c1026]/90 backdrop-blur-xl border border-white/[0.08] shadow-lg flex flex-col justify-between min-h-[148px] relative z-10">
+              <div className={`flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-3.5 lg:gap-4 relative items-stretch ${openDropdown && isCard6Active ? 'z-30' : 'z-10'}`}>
+                {/* 5. JAVA RUNTIME */}
+                <div className="p-4 sm:p-5 rounded-2xl bg-[#0c102a]/85 backdrop-blur-xl border border-white/[0.08] shadow-[0_8px_30px_rgba(0,0,0,0.45)] flex flex-col justify-between min-h-[148px] relative z-10">
                   <div className="flex items-center space-x-3 shrink-0">
-                    <div className="w-8 h-8 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
-                      <Coffee className="w-4 h-4" />
+                    <div className="w-9 h-9 rounded-xl bg-blue-500/15 border border-blue-500/25 flex items-center justify-center text-blue-400 shrink-0 shadow-sm">
+                      <Coffee className="w-4.5 h-4.5" />
                     </div>
                     <div>
-                      <h3 className="text-[13px] font-bold text-white leading-tight">Java Runtime</h3>
-                      <p className="text-[11px] text-slate-400 leading-tight">Manage the Java version used to launch this instance.</p>
+                      <h3 className="text-sm font-bold text-white tracking-wide">Java Runtime</h3>
+                      <p className="text-xs text-slate-400 mt-0.5">Manage the Java version used to launch this instance.</p>
                     </div>
                   </div>
 
-                  <div className="bg-[#090b16] border border-white/[0.08] hover:border-white/[0.12] rounded-xl p-3 sm:p-3.5 flex items-center justify-between transition-all my-auto">
+                  <div className="bg-[#080b1e] border border-white/[0.08] hover:border-white/[0.12] rounded-xl p-3 sm:p-3.5 flex items-center justify-between transition-all my-auto">
                     <div className="flex items-center space-x-3 min-w-0 flex-1">
-                      {/* Authentic Java Logo Container matching target image */}
+                      {/* Authentic Java Logo Container matching reference image */}
                       <div className="w-11 h-11 rounded-xl bg-[#0b1029] border border-[#1e2d6b] flex items-center justify-center shrink-0 shadow-inner">
                         <JavaLogoSVG className="w-8 h-8" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center space-x-2">
-                          <span className="text-xs sm:text-[13px] font-bold text-white truncate">
+                          <span className="text-xs sm:text-sm font-bold text-white truncate">
                             Java {activeJavaInfo.version || `${recommendedJavaMajor}.0.0`} ({activeJavaInfo.arch || '64-Bit'})
                           </span>
                           {activeJavaInfo.isDetected ? (
@@ -4092,7 +4091,7 @@ export const InstanceDetailView: React.FC<InstanceDetailViewProps> = ({
                             </span>
                           )}
                         </div>
-                        <p className="text-[11px] font-mono text-slate-400 truncate mt-1 max-w-[280px]" title={activeJavaInfo.path}>
+                        <p className="text-xs font-mono text-slate-400 truncate mt-1 max-w-[280px]" title={activeJavaInfo.path}>
                           {activeJavaInfo.path}
                         </p>
                       </div>
@@ -4117,7 +4116,7 @@ export const InstanceDetailView: React.FC<InstanceDetailViewProps> = ({
                         <button
                           type="button"
                           onClick={handleChangeJava}
-                          className="h-10 px-4 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.12] hover:border-blue-500/40 text-xs font-semibold text-slate-200 hover:text-white flex items-center space-x-2 transition-all shadow-sm shrink-0 whitespace-nowrap cursor-pointer"
+                          className="h-10 px-4.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.12] hover:border-blue-500/40 text-xs font-semibold text-slate-200 hover:text-white flex items-center space-x-2 transition-all shadow-sm shrink-0 whitespace-nowrap cursor-pointer"
                         >
                           <FolderOpen className="w-4 h-4 text-cyan-400 shrink-0" />
                           <span>Change Java</span>
@@ -4127,42 +4126,45 @@ export const InstanceDetailView: React.FC<InstanceDetailViewProps> = ({
                   </div>
                 </div>
 
-                {/* 6. LAUNCH OPTIONS & BACKUP RECOVERY */}
-                <div className={`p-4 sm:p-4.5 rounded-2xl bg-[#0c1026]/90 backdrop-blur-xl border border-white/[0.08] shadow-lg flex flex-col justify-between min-h-[148px] relative ${isCard6Active ? 'z-50' : 'z-10'}`}>
+                {/* 6. LAUNCH & BACKUP */}
+                <div className={`p-4 sm:p-5 rounded-2xl bg-[#0c102a]/85 backdrop-blur-xl border border-white/[0.08] shadow-[0_8px_30px_rgba(0,0,0,0.45)] flex flex-col justify-between min-h-[148px] relative ${isCard6Active ? 'z-50' : 'z-10'}`}>
                   <div className="flex items-center space-x-3 shrink-0">
-                    <div className="w-8 h-8 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
-                      <Terminal className="w-4 h-4" />
+                    <div className="w-9 h-9 rounded-xl bg-blue-500/15 border border-blue-500/25 flex items-center justify-center text-blue-400 shrink-0 shadow-sm">
+                      <Terminal className="w-4.5 h-4.5" />
                     </div>
                     <div>
-                      <h3 className="text-[13px] font-bold text-white leading-tight">Launch &amp; Backup</h3>
-                      <p className="text-[11px] text-slate-400 leading-tight">JVM arguments, memory options &amp; automatic backup.</p>
+                      <h3 className="text-sm font-bold text-white tracking-wide">Launch &amp; Backup</h3>
+                      <p className="text-xs text-slate-400 mt-0.5">JVM arguments, memory options and automatic backup.</p>
                     </div>
                   </div>
 
                   {/* Controls Container */}
-                  <div className="space-y-2.5 my-auto pt-1">
+                  <div className="space-y-2.5 my-auto pt-2">
                     {/* Top: JVM Args */}
-                    <div className="relative">
-                      <div className="h-11 bg-[#090b16] border border-white/[0.08] hover:border-white/[0.15] rounded-xl px-3.5 flex items-center justify-between transition-all">
-                        <input
-                          type="text"
-                          value={jvmArgs}
-                          onChange={(e) => setJvmArgs(e.target.value)}
-                          className="w-full bg-transparent font-mono text-xs text-slate-200 focus:outline-none pr-2"
-                          placeholder="-Xmx4G -XX:+UseG1GC -XX:+ParallelRefProcEnabled"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowJvmExpanded(!showJvmExpanded)}
-                          className="text-slate-400 hover:text-white p-1 transition-colors shrink-0 cursor-pointer"
-                          title={showJvmExpanded ? "Collapse" : "Expand JVM Options"}
-                        >
-                          {showJvmExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-                        </button>
+                    <div>
+                      <div className="flex items-center space-x-3">
+                        <span className="text-xs font-semibold text-slate-300 shrink-0">JVM Arguments</span>
+                        <div className="h-11 flex-1 bg-[#080b1e] border border-white/[0.08] hover:border-white/[0.15] rounded-xl px-3.5 flex items-center justify-between transition-all">
+                          <input
+                            type="text"
+                            value={jvmArgs}
+                            onChange={(e) => setJvmArgs(e.target.value)}
+                            className="w-full bg-transparent font-mono text-xs text-slate-200 focus:outline-none pr-2"
+                            placeholder="-Xmx4G -XX:+UseG1GC -XX:+ParallelRefProcEnabled"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowJvmExpanded(!showJvmExpanded)}
+                            className="text-slate-400 hover:text-white p-1 transition-colors shrink-0 cursor-pointer"
+                            title={showJvmExpanded ? "Collapse" : "Expand JVM Options"}
+                          >
+                            {showJvmExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                          </button>
+                        </div>
                       </div>
 
                       {showJvmExpanded && (
-                        <div className="mt-1.5 p-2.5 bg-[#090b16] border border-white/[0.1] rounded-xl">
+                        <div className="mt-1.5 p-2.5 bg-[#080b1e] border border-white/[0.1] rounded-xl">
                           <textarea
                             rows={2}
                             value={jvmArgs}
@@ -4199,7 +4201,7 @@ export const InstanceDetailView: React.FC<InstanceDetailViewProps> = ({
                         <button
                           type="button"
                           onClick={() => { sounds.playClick(); setOpenDropdown(openDropdown === 'retention' ? null : 'retention'); }}
-                          className="h-9 px-3 rounded-xl bg-[#090b16] border border-white/[0.08] hover:border-white/[0.15] text-xs text-white font-medium flex items-center space-x-1.5 transition-all cursor-pointer"
+                          className="h-9 px-3 rounded-xl bg-[#080b1e] border border-white/[0.08] hover:border-white/[0.15] text-xs text-white font-medium flex items-center space-x-1.5 transition-all cursor-pointer"
                         >
                           <span className="truncate max-w-[120px]">{backupRetention}</span>
                           <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${openDropdown === 'retention' ? 'rotate-180 text-blue-400' : ''}`} />
