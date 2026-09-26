@@ -1924,19 +1924,6 @@ export const InstanceDetailView: React.FC<InstanceDetailViewProps> = ({
   return (
     <div className="w-full h-full flex flex-col select-none p-4 sm:p-5 lg:p-5 gap-3 sm:gap-3.5 font-sans overflow-hidden">
       {/* ========================================================================= */}
-      {/* SUBPAGE TITLE HEADER — Matches reference mockup top title                 */}
-      {/* ========================================================================= */}
-      <div className="flex items-center gap-2.5 px-1 shrink-0">
-        <currentBannerConfig.icon className={`w-5 h-5 ${currentBannerConfig.iconColor} drop-shadow-[0_0_8px_rgba(99,102,241,0.5)] shrink-0`} />
-        <h2 className="text-xs sm:text-[13px] font-display font-extrabold tracking-wider text-white uppercase shrink-0">
-          {currentBannerConfig.label}
-        </h2>
-        <span className="text-xs text-slate-400 font-medium truncate">
-          {currentBannerConfig.desc}
-        </span>
-      </div>
-
-      {/* ========================================================================= */}
       {/* HERO BANNER CARD — Unified panoramic banner with dedicated subpage artwork */}
       {/* ========================================================================= */}
       <div className="w-full relative rounded-3xl overflow-hidden border border-white/[0.1] shadow-2xl h-[200px] sm:h-[215px] lg:h-[225px] xl:h-[235px] group shrink-0 z-20">
