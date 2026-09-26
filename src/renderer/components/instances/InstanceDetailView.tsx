@@ -1952,29 +1952,29 @@ export const InstanceDetailView: React.FC<InstanceDetailViewProps> = ({
         </div>
 
         {/* Top Right Quote */}
-        <div className="absolute top-4 right-7 text-right hidden sm:block pointer-events-none select-none z-10">
+        <div className="absolute top-5 right-6 sm:right-8 xl:right-9 text-right hidden sm:block pointer-events-none select-none z-10">
           <p className="text-xs sm:text-[13px] xl:text-sm font-display font-medium text-slate-300/85 italic tracking-wider leading-snug drop-shadow-[0_2px_10px_rgba(0,0,0,0.85)]">
             "{' '}{currentBannerConfig.quoteLine1}<br />{currentBannerConfig.quoteLine2}{' '}"
           </p>
         </div>
 
-        <div className="relative h-full flex flex-col justify-between px-6 sm:px-8 xl:px-9 py-5 sm:py-5.5 xl:py-6 z-10">
-          {/* Top section: Back button + Title + Meta info */}
-          <div className="flex items-center gap-4.5 min-w-0">
-            {/* Back Button */}
+        <div className="relative h-full flex flex-col justify-between pl-5 sm:pl-6 xl:pl-7 pr-6 sm:pr-8 xl:pr-9 py-5 sm:py-6 z-10">
+          {/* Top section: Back button + Title + Meta info with spacious breathing room */}
+          <div className="flex items-center gap-5 sm:gap-6 xl:gap-7 min-w-0">
+            {/* Back Button — Positioned comfortably on the left */}
             <button
               onClick={() => { sounds.playClick(); onBack(); }}
-              className="w-11 h-11 rounded-2xl bg-[#0f1638]/90 hover:bg-[#182356] text-slate-300 hover:text-white border border-[#233374] flex items-center justify-center transition-all active:scale-95 shrink-0 cursor-pointer shadow-md"
+              className="w-11 h-11 rounded-2xl bg-[#0f1638]/90 hover:bg-[#182356] text-slate-300 hover:text-white border border-[#233374] hover:border-cyan-500/40 flex items-center justify-center transition-all active:scale-95 shrink-0 cursor-pointer shadow-md hover:shadow-[0_0_15px_rgba(6,182,212,0.25)]"
               title="Back to instances"
             >
-              <ArrowLeft className="w-5 h-5" />
+              <ArrowLeft className="w-5 h-5 transition-transform group-hover:-translate-x-0.5" />
             </button>
 
             {/* Info */}
-            <div className="space-y-2 min-w-0">
+            <div className="space-y-1.5 sm:space-y-2 min-w-0">
               {/* Title row */}
-              <div className="flex items-center gap-3">
-                <h1 className="text-2xl sm:text-3xl xl:text-4xl font-display font-extrabold text-white tracking-tight truncate drop-shadow-md">
+              <div className="flex items-center gap-2.5 sm:gap-3">
+                <h1 className="text-2xl sm:text-3xl xl:text-4xl font-display font-extrabold text-white tracking-tight truncate drop-shadow-md leading-tight">
                   {instance.name}
                 </h1>
                 <button
@@ -1993,20 +1993,20 @@ export const InstanceDetailView: React.FC<InstanceDetailViewProps> = ({
               </div>
 
               {/* Meta row */}
-              <div className="flex items-center gap-2.5 text-xs sm:text-sm text-slate-300 font-medium">
+              <div className="flex items-center gap-2.5 sm:gap-3 text-xs sm:text-sm text-slate-300 font-medium">
                 <span className="flex items-center gap-1.5 text-white/90">
-                  <Box className="w-4 h-4 text-purple-400" />
+                  <Box className="w-4 h-4 text-purple-400 shrink-0" />
                   <span className="capitalize">{instance.loader}</span>
                   <span>{instance.version}</span>
                 </span>
-                <span className="text-white/30">•</span>
+                <span className="text-white/30 select-none">•</span>
                 <span className="flex items-center gap-1.5 text-slate-400">
-                  <Clock className="w-4 h-4 text-slate-500" />
+                  <Clock className="w-4 h-4 text-slate-500 shrink-0" />
                   <span>{formatPlaytime(instance.playTimeMinutes)}</span>
                 </span>
-                <span className="text-white/30">•</span>
+                <span className="text-white/30 select-none">•</span>
                 <span className="flex items-center gap-1.5 text-slate-400">
-                  <Calendar className="w-4 h-4 text-slate-500" />
+                  <Calendar className="w-4 h-4 text-slate-500 shrink-0" />
                   <span>{formatLastPlayed(instance.lastPlayed)}</span>
                 </span>
               </div>
@@ -2014,11 +2014,11 @@ export const InstanceDetailView: React.FC<InstanceDetailViewProps> = ({
           </div>
 
           {/* Bottom Row: Badges & Action Buttons strictly on the left, leaving the right artwork completely visible */}
-          <div className="flex items-center gap-3 flex-wrap pt-2 z-10">
+          <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap pt-2 z-10">
             {/* Badges row */}
             <button
               onClick={() => { sounds.playClick(); setShowHealthModal(true); }}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-emerald-500/15 border border-emerald-500/35 text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.25)] hover:scale-105 transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-emerald-500/15 border border-emerald-500/35 text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.25)] hover:scale-105 transition-all cursor-pointer shrink-0"
               title="View instance health report"
             >
               <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_#34d399] shrink-0" />
@@ -2027,21 +2027,21 @@ export const InstanceDetailView: React.FC<InstanceDetailViewProps> = ({
 
             <button
               onClick={() => setActiveTab('content')}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium bg-[#0f1638] hover:bg-[#182356] border border-[#233374] text-slate-300 transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium bg-[#0f1638] hover:bg-[#182356] border border-[#233374] text-slate-300 transition-colors cursor-pointer shrink-0"
             >
               <span>{mods.length} Mods</span>
             </button>
 
-            <span className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium bg-[#0f1638] border border-[#233374] text-slate-300">
+            <span className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium bg-[#0f1638] border border-[#233374] text-slate-300 shrink-0">
               <span>{totalWorldSizeBytes > 0 ? formatBytes(totalWorldSizeBytes) : '15 MB'}</span>
             </span>
 
-            <span className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium bg-[#0f1638] border border-[#233374] text-slate-300">
+            <span className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium bg-[#0f1638] border border-[#233374] text-slate-300 shrink-0">
               <span>{backups.length > 0 ? `${backups.length} backups` : 'No backups'}</span>
             </span>
 
             {/* Action Buttons alongside badges */}
-            <div className="flex items-center gap-2.5 ml-1.5">
+            <div className="flex items-center gap-2 sm:gap-2.5 ml-1 sm:ml-2 shrink-0">
               {instance.isRunning ? (
                 <button
                   onClick={() => onKill(instance)}
